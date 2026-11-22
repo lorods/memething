@@ -56,7 +56,7 @@ public class Main {
 			if (!argtemdirimg) {
 				if (lsarg[(i-1)].equals("--imgdir") && new File(lsarg[i]).isDirectory()) {
 					BufferedImage[] conjimg = validarDirImg(lsarg[i]);
-					for(int j=0;i<conjimg.length;j++) {
+					for(int j=0;j<conjimg.length;j++) {
 						System.out.printf("\nOpacidade da imagem: %d\n",conjimg[j].getTransparency());
 					}
 				}
