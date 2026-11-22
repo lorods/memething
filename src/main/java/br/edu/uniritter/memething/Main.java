@@ -10,9 +10,11 @@ import javax.imageio.ImageIO;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.awt.image.BufferedImage;
+import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
 import java.io.File;
+import java.security.SecureRandom;
 
 public class Main {
 
@@ -85,9 +87,13 @@ public class Main {
 			return;
 		}
 		EncapsuladorEntradaEdicao conjartefato = manipularComposicaoArg(args, COMPRIM_REAL);
-		System.out.printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n",
+		/*System.out.printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n",
 				conjartefato.getConjimg().length, Arrays.toString(conjartefato.getConjlegend()),
-				conjartefato.getLadoedicaovert());
+				conjartefato.getLadoedicaovert());*/
+		if(conjartefato!=null) {
+			BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
+			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()));
+		}
 	}
 
 	private static String aferirIntervaloComprimento(int comprim_min, int comprim_max, int comprim_real) {
@@ -195,5 +201,26 @@ public class Main {
 		}
 		leitorarq.close();
 		return conjlegend;
+	}
+	
+	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg) {
+		return conjamostraimg[obterIntAleatSegur(conjamostraimg.length)];
+	}
+	
+	private static String obterStringAleatoria(String[] conjlegend) {
+		return conjlegend[obterIntAleatSegur(conjlegend.length)];
+	}
+	
+	private static int obterIntAleatSegur(int comprim) {
+		return new SecureRandom().nextInt(comprim);
+	}
+	
+	private static Graphics  desenharStringEmImg(BufferedImage imgaleat, String frase) {
+		Font fntsis = new Font("Noto Sans",Font.BOLD,18);
+		Graphics grafimg = imgaleat.getGraphics();
+		grafimg.setFont(fntsis);
+		grafimg.setColor(Color.BLACK);
+		grafimg.drawString(frase, 0, 20);
+		return grafimg;
 	}
 }
