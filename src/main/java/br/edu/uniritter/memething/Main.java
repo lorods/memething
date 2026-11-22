@@ -4,8 +4,12 @@ import java.io.DataOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.Date;
+import java.util.Locale;
 
 import javax.imageio.ImageIO;
+
+import sun.awt.X11.Screen;
 
 import java.io.BufferedReader;
 import java.io.DataInputStream;
@@ -13,15 +17,19 @@ import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.Graphics;
+import java.awt.Point;
 import java.io.File;
 import java.security.SecureRandom;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 
 public class Main {
 
 	protected static class EncapsuladorEntradaEdicao {
 		private BufferedImage[] conjimg;
 		private String[] conjlegend;
-		private String ladoedicaovert;
+		private String ladoedicaovert, direscrita, nmarqescrit;
 
 		protected EncapsuladorEntradaEdicao() {
 
@@ -36,6 +44,8 @@ public class Main {
 			this.conjimg = conjimg;
 			this.conjlegend = conjlegend;
 			this.ladoedicaovert = ladoeditvert;
+			this.direscrita = direscrita;
+			this.nmarqescrit = nmarqescrit;
 		}
 
 		protected BufferedImage[] getConjimg() {
@@ -60,6 +70,37 @@ public class Main {
 
 		protected void setLadoedicaovert(String ladoeditvert) {
 			this.ladoedicaovert = ladoeditvert;
+		}
+
+		protected String getDirescrita() {
+			return direscrita;
+		}
+
+		protected void setDirescrita(String direscrita) {
+			this.direscrita = direscrita;
+		}
+
+		protected String getNmarqescrit() {
+			return nmarqescrit;
+		}
+
+		protected void setNmarqescrit(String nmarqescrit) {
+			this.nmarqescrit = nmarqescrit;
+		}
+	}
+
+	enum LadoEditavelImg {
+		TOPO {
+			@Override
+			public String toString() {
+				return "top";
+			}
+		},
+		BAIXO {
+			@Override
+			public String toString() {
+				return "bottom";
+			}
 		}
 	}
 
@@ -87,12 +128,22 @@ public class Main {
 			return;
 		}
 		EncapsuladorEntradaEdicao conjartefato = manipularComposicaoArg(args, COMPRIM_REAL);
-		/*System.out.printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n",
-				conjartefato.getConjimg().length, Arrays.toString(conjartefato.getConjlegend()),
-				conjartefato.getLadoedicaovert());*/
-		if(conjartefato!=null) {
+		/*
+		 * System.out.
+		 * printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n"
+		 * , conjartefato.getConjimg().length,
+		 * Arrays.toString(conjartefato.getConjlegend()),
+		 * conjartefato.getLadoedicaovert());
+		 */
+		if (conjartefato != null) {
 			BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
 			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()));
+			String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
+					.format(Instant.now());
+			String direscrita = conjartefato.getDirescrita();
+			File arqpescrita = new File(direscrita, "out/meme_".concat(seloatualdatahr).concat(".png"));
+			manipularArqSaida(arqpescrita);
+			gravarImgEmArq(imgaleat, arqpescrita);
 		}
 	}
 
@@ -113,28 +164,15 @@ public class Main {
 		String[] conjlegend = new String[0];
 		String ladoedicaovert = new String();
 		EncapsuladorEntradaEdicao conjartefretornado = new EncapsuladorEntradaEdicao();
-		enum LadoEditavelImg {
-			TOPO {
-				@Override
-				public String toString() {
-					return "top";
-				}
-			},
-			BAIXO {
-				@Override
-				public String toString() {
-					return "bottom";
-				}
-			}
-		}
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
 				if (lsarg[(i - 1)].equals(IMGDIRFLAG) && new File(lsarg[i]).isDirectory()) {
-					conjimg = validarDirImg(lsarg[i]);
+					conjimg = validarImgEmDir(lsarg[i]);
 					for (int j = 0; j < conjimg.length; j++) {
 						System.out.printf("\nOpacidade da imagem: %d\n", conjimg[j].getTransparency());
 					}
 					argtemdirimg = true;
+					conjartefretornado.setDirescrita(lsarg[i]);
 				}
 			}
 
@@ -172,9 +210,9 @@ public class Main {
 		return conjartefretornado;
 	}
 
-	private static BufferedImage[] validarDirImg(String caminhodir) throws IOException {
+	private static BufferedImage[] validarImgEmDir(String caminhodir) throws IOException {
 		File dirimg = new File(caminhodir);
-		File[] lsarq = dirimg.listFiles();
+		File[] lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
 		BufferedImage[] conjimg = new BufferedImage[0];
 		for (int i = 0; i < lsarq.length; i++) {
 			if (ImageIO.read(lsarq[i]) != null) {
@@ -202,25 +240,37 @@ public class Main {
 		leitorarq.close();
 		return conjlegend;
 	}
-	
+
 	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg) {
 		return conjamostraimg[obterIntAleatSegur(conjamostraimg.length)];
 	}
-	
+
 	private static String obterStringAleatoria(String[] conjlegend) {
 		return conjlegend[obterIntAleatSegur(conjlegend.length)];
 	}
-	
+
 	private static int obterIntAleatSegur(int comprim) {
 		return new SecureRandom().nextInt(comprim);
 	}
-	
-	private static Graphics  desenharStringEmImg(BufferedImage imgaleat, String frase) {
-		Font fntsis = new Font("Noto Sans",Font.BOLD,18);
+
+	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase) {
+		Font fntsis = new Font("Noto Sans", Font.BOLD, 200);
 		Graphics grafimg = imgaleat.getGraphics();
 		grafimg.setFont(fntsis);
 		grafimg.setColor(Color.BLACK);
-		grafimg.drawString(frase, 0, 20);
+		grafimg.drawString(frase, 0, 200);
 		return grafimg;
+	}
+
+	private static void manipularArqSaida(File arqsaida) {
+		if (arqsaida.exists())
+			return;
+		else
+			arqsaida.getParentFile().mkdirs();
+	}
+
+	private static void gravarImgEmArq(BufferedImage imgmeme, File arqagravar) throws IOException {
+		ImageIO.write(imgmeme, "png", arqagravar);
+		System.out.printf("\nUm novo meme foi gravado com sucesso.\n");
 	}
 }
