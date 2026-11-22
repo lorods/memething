@@ -15,6 +15,52 @@ import java.awt.Graphics;
 import java.io.File;
 
 public class Main {
+
+	protected static class EncapsuladorEntradaEdicao {
+		private BufferedImage[] conjimg;
+		private String[] conjlegend;
+		private String ladoedicaovert;
+
+		protected EncapsuladorEntradaEdicao() {
+
+		}
+
+		protected EncapsuladorEntradaEdicao(BufferedImage[] conjimg, String[] conjlegend) {
+			this.conjimg = conjimg;
+			this.conjlegend = conjlegend;
+		}
+
+		protected EncapsuladorEntradaEdicao(BufferedImage[] conjimg, String[] conjlegend, String ladoeditvert) {
+			this.conjimg = conjimg;
+			this.conjlegend = conjlegend;
+			this.ladoedicaovert = ladoeditvert;
+		}
+
+		protected BufferedImage[] getConjimg() {
+			return conjimg;
+		}
+
+		protected void setConjimg(BufferedImage[] conjimg) {
+			this.conjimg = conjimg;
+		}
+
+		protected String[] getConjlegend() {
+			return conjlegend;
+		}
+
+		protected void setConjlegend(String[] conjlegend) {
+			this.conjlegend = conjlegend;
+		}
+
+		protected String getLadoedicaovert() {
+			return ladoedicaovert;
+		}
+
+		protected void setLadoedicaovert(String ladoeditvert) {
+			this.ladoedicaovert = ladoeditvert;
+		}
+	}
+
 	/*
 	 * Regras de negócio: 1: Processar ao menos uma string do arquivo com frases de
 	 * legenda e no máximo 100 MB do arquivo, caso contrário pular restantes 2:
@@ -22,6 +68,8 @@ public class Main {
 	 * uma pasta com 500 MB em imagens, caso contrário pular restantes 3: Receber no
 	 * mínimo quatro argumentos conhecidos e no máximo seis argumentos conhecidos
 	 */
+
+	private static final String CAPTIONLSFLAG = "--captionls", IMGDIRFLAG = "--imgdir", EDITEDEDGEFLAG = "--edge";
 
 	public static void main(String[] args) throws IOException {
 		final int COMPRIM_MIN_VETSTR = 1;
@@ -36,7 +84,10 @@ public class Main {
 			System.out.printf("Erro: %s\n", razaoerro);
 			return;
 		}
-		razaoerro = aferirComposicaoArg(args, COMPRIM_REAL);
+		EncapsuladorEntradaEdicao conjartefato = manipularComposicaoArg(args, COMPRIM_REAL);
+		System.out.printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n",
+				conjartefato.getConjimg().length, Arrays.toString(conjartefato.getConjlegend()),
+				conjartefato.getLadoedicaovert());
 	}
 
 	private static String aferirIntervaloComprimento(int comprim_min, int comprim_max, int comprim_real) {
@@ -49,32 +100,70 @@ public class Main {
 		return razaoretornocomp;
 	}
 
-	private static String aferirComposicaoArg(String[] lsarg, int comprim_real) throws IOException {
-		boolean argtemarqfrase = false, argtemdirimg = false, argtemposicvert = false;
-
+	private static EncapsuladorEntradaEdicao manipularComposicaoArg(String[] lsarg, int comprim_real)
+			throws IOException {
+		boolean argtemarqfrase = false, argtemdirimg = false, ladoedicaoestadef = false, conjargestasuficiente = false;
+		BufferedImage[] conjimg = new BufferedImage[0];
+		String[] conjlegend = new String[0];
+		String ladoedicaovert = new String();
+		EncapsuladorEntradaEdicao conjartefretornado = new EncapsuladorEntradaEdicao();
+		enum LadoEditavelImg {
+			TOPO {
+				@Override
+				public String toString() {
+					return "top";
+				}
+			},
+			BAIXO {
+				@Override
+				public String toString() {
+					return "bottom";
+				}
+			}
+		}
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
-				if (lsarg[(i-1)].equals("--imgdir") && new File(lsarg[i]).isDirectory()) {
-					BufferedImage[] conjimg = validarDirImg(lsarg[i]);
-					for(int j=0;j<conjimg.length;j++) {
-						System.out.printf("\nOpacidade da imagem: %d\n",conjimg[j].getTransparency());
+				if (lsarg[(i - 1)].equals(IMGDIRFLAG) && new File(lsarg[i]).isDirectory()) {
+					conjimg = validarDirImg(lsarg[i]);
+					for (int j = 0; j < conjimg.length; j++) {
+						System.out.printf("\nOpacidade da imagem: %d\n", conjimg[j].getTransparency());
 					}
+					argtemdirimg = true;
 				}
 			}
 
 			if (!argtemarqfrase) {
-				if (lsarg[(i-1)].equals("--captionls") && new File(lsarg[i]).isFile()) {
-					String[] conjlegend = validarArqFrase(lsarg[i]);
-					System.out.printf("Strings de frases: %s.",Arrays.toString(conjlegend));
+				if (lsarg[(i - 1)].equals(CAPTIONLSFLAG) && new File(lsarg[i]).isFile()) {
+					conjlegend = validarArqFrase(lsarg[i]);
+					System.out.printf("Strings de frases: %s.", Arrays.toString(conjlegend));
+					argtemarqfrase = true;
 				}
 			}
 
-			if (!argtemposicvert) {
-				if (lsarg[(i-1)].equals("--edge"))
-					break; // chamar metodo para validar edge e se válido alterar argtemposicvert
+			if (!ladoedicaoestadef) {
+				if (lsarg[(i - 1)].equals(EDITEDEDGEFLAG)) {
+					ladoedicaovert = lsarg[i].equals(LadoEditavelImg.BAIXO.toString())
+							? LadoEditavelImg.BAIXO.toString()
+							: LadoEditavelImg.TOPO.toString();
+					ladoedicaoestadef = true;
+				}
+			}
+			if (argtemdirimg && argtemarqfrase) {
+				conjartefretornado.setConjimg(conjimg);
+				conjartefretornado.setConjlegend(conjlegend);
+
+				if (ladoedicaoestadef) {
+					conjartefretornado.setLadoedicaovert(ladoedicaovert);
+					return conjartefretornado;
+				}
+				conjargestasuficiente = true;
 			}
 		}
-		return "ok";
+		if (conjargestasuficiente)
+			conjartefretornado.setLadoedicaovert(LadoEditavelImg.TOPO.toString());
+		else
+			conjartefretornado = null;
+		return conjartefretornado;
 	}
 
 	private static BufferedImage[] validarDirImg(String caminhodir) throws IOException {
