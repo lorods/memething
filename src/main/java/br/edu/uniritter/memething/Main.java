@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Scanner;
 
 import javax.imageio.ImageIO;
@@ -25,6 +26,7 @@ import java.awt.font.GlyphVector;
 import java.awt.font.TextAttribute;
 import java.io.File;
 import java.security.SecureRandom;
+import java.text.AttributedCharacterIterator.Attribute;
 import java.text.AttributedString;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -124,7 +126,8 @@ public class Main {
 
 	private static final String CAPTIONLSFLAG = "--captionls", IMGDIRFLAG = "--imgdir", EDITEDEDGEFLAG = "--edge";
 
-	public static void main(String[] args) throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+	public static void main(String[] args)
+			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		final int COMPRIM_MIN_VETSTR = 1;
 		final int TAM_MAX_MB_ARQSTR = 100;
 		final int COMPRIM_MIN_VETIMG = 1;
@@ -132,10 +135,11 @@ public class Main {
 		final int COMPRIM_MIN_ARG = 4;
 		final int COMPRIM_MAX_ARG = 6;
 		final int COMPRIM_REAL = args.length;
-		execOperacionalizacao(COMPRIM_MIN_ARG,COMPRIM_MAX_ARG,COMPRIM_REAL,args);
+		execOperacionalizacao(COMPRIM_MIN_ARG, COMPRIM_MAX_ARG, COMPRIM_REAL, args);
 	}
 
-	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args) throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args)
+			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		Scanner escaneadr = new Scanner(System.in);
 		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real);
 		if (razaoerro != null) {
@@ -151,23 +155,28 @@ public class Main {
 		 * conjartefato.getLadoedicaovert());
 		 */
 		int selecaoescolhamenu;
+		AttributedString txtcomatr = new AttributedString(new String("-"));
 		do {
-			selecaoescolhamenu = encaminharOpcaoMenu(escaneadr,conjartefato);
+			selecaoescolhamenu = encaminharOpcaoMenu(escaneadr, conjartefato, txtcomatr);
 		} while (selecaoescolhamenu != -1);
 		escaneadr.close();
 	}
 
-	private static int encaminharOpcaoMenu(Scanner escaneadr, EncapsuladorEntradaEdicao conjartefato) throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+	private static int encaminharOpcaoMenu(Scanner escaneadr, EncapsuladorEntradaEdicao conjartefato, AttributedString txtcomatr)
+			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
 		int selecaomenu = escaneadr.nextInt();
 		selecaomenu--;
-		AttributedString txtcomatr = new AttributedString(new String());
 		if (selecaomenu == OpcaoValidaMenu.CRIARMEME.ordinal()) {
 			if (conjartefato != null) {
+				Map<Attribute, Object> conjatr = txtcomatr.getIterator().getAttributes();
 				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
-				Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()),
-						conjartefato.getLadoedicaovert());
+				String frasesel = obterStringAleatoria(conjartefato.getConjlegend());
+				txtcomatr = new AttributedString(frasesel);
+				txtcomatr.addAttributes(conjatr, 0, frasesel.length());
+				Graphics ctxgrafimg = desenharStringEmImg(imgaleat, frasesel, conjartefato.getLadoedicaovert(),
+						!txtcomatr.getIterator().getAllAttributeKeys().isEmpty() ? txtcomatr : null);
 				String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
 						.format(Instant.now());
 				String direscrita = conjartefato.getDirescrita();
@@ -176,19 +185,25 @@ public class Main {
 				gravarImgEmArq(imgaleat, arqpescrita);
 			}
 		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRFNTNAMEM.ordinal()) {
-			System.out.printf("Insira ao lado o nome da fonte tipográfica para a legenda do meme (por exemplo, Arial): ");
+			System.out
+					.printf("Insira ao lado o nome da fonte tipográfica para a legenda do meme (por exemplo, Arial): ");
+			escaneadr.nextLine();
 			String nomefamiliafnt = escaneadr.nextLine();
 			boolean fntdisponivel = aferirDisponibilidadeFnt(nomefamiliafnt);
-			if(!fntdisponivel) {
+			if (!fntdisponivel) {
 				System.out.printf("A fonte que você informou não pôde ser carregada de seu sistema.\n");
-			}
-			else txtcomatr.addAttribute(TextAttribute.FAMILY,nomefamiliafnt);
+			} else
+				txtcomatr.addAttribute(TextAttribute.FAMILY, nomefamiliafnt);
 		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRCORFNTNAMEM.ordinal()) {
-			System.out.printf("Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, red): ");
+			System.out.printf(
+					"Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, red): ");
+			escaneadr.nextLine();
 			String nomecorfnt = escaneadr.nextLine();
 			Color cordisponivel = procurarFntLocal(nomecorfnt);
-			if(cordisponivel==null) System.out.printf("A cor que você informou não pôde ser localizada.");
-			else txtcomatr.addAttribute(TextAttribute.FOREGROUND,cordisponivel);
+			if (cordisponivel == null)
+				System.out.printf("A cor que você informou não pôde ser localizada.");
+			else
+				txtcomatr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
 		} else if (selecaomenu == OpcaoValidaMenu.ENCERRARPROG.ordinal()) {
 			System.out.printf("Opção inválida! Listando operações novamente...\n");
 			return -1;
@@ -303,18 +318,25 @@ public class Main {
 	private static int obterIntAleatSegur(int comprim) {
 		return new SecureRandom().nextInt(comprim);
 	}
-	
+
 	private static boolean aferirDisponibilidadeFnt(String nomefamiliafnt) {
 		String[] bibfnt = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
 		return Arrays.asList(bibfnt).contains(nomefamiliafnt);
 	}
-	
-	private static Color procurarFntLocal(String nomecorfnt) throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
+
+	private static Color procurarFntLocal(String nomecorfnt)
+			throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
 		return Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
 	}
 
-	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita) {
-		Font fntsis = new Font("Noto Sans", Font.BOLD, 100);
+	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita,
+			AttributedString atrtxt) throws NullPointerException {
+		Object atrfamfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FAMILY) : (Object) "Arial",
+				atrcorfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FOREGROUND) : Color.BLACK;
+		Font fntsis = atrfamfnt != null ? new Font(atrfamfnt.toString(), Font.BOLD, 100)
+				: new Font("Arial", Font.BOLD, 100);
+		if (atrcorfnt == null)
+			atrtxt.addAttribute(TextAttribute.FOREGROUND, Color.BLACK);
 		Graphics grafimg = imgaleat.getGraphics();
 		FontMetrics inspetorfnt = grafimg.getFontMetrics(fntsis);
 		GlyphVector vetglifo = fntsis.createGlyphVector(inspetorfnt.getFontRenderContext(), frase);
@@ -324,13 +346,19 @@ public class Main {
 			fntsis = fntsis.deriveFont(fntsis.getStyle(), tamfntredimens);
 			inspetorfnt = grafimg.getFontMetrics(fntsis);
 		}
+		if (atrtxt != null)
+			atrtxt.addAttribute(TextAttribute.FONT, fntsis);
 		int posX = calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
 				posY = LadoEditavelImg.BAIXO.toString().equals(ladovertescrita)
 						? imgaleat.getHeight() - inspetorfnt.getAscent()
 						: inspetorfnt.getAscent() * 2;
 		grafimg.setFont(fntsis);
 		grafimg.setColor(Color.BLACK);
-		grafimg.drawString(frase, posX, posY);
+		if (atrtxt == null) {
+			grafimg.drawString(frase, posX, posY);
+		} else {
+			grafimg.drawString(atrtxt.getIterator(), posX, posY);
+		}
 		return grafimg;
 	}
 
