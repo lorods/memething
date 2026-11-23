@@ -3,21 +3,23 @@ package br.edu.uniritter.memething;
 import java.io.DataOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
 
 import javax.imageio.ImageIO;
-
-import sun.awt.X11.Screen;
-
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Point;
+import java.awt.Shape;
+import java.awt.font.GlyphVector;
 import java.io.File;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -137,7 +139,8 @@ public class Main {
 		 */
 		if (conjartefato != null) {
 			BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
-			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()));
+			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()),
+					conjartefato.getLadoedicaovert());
 			String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
 					.format(Instant.now());
 			String direscrita = conjartefato.getDirescrita();
@@ -253,12 +256,24 @@ public class Main {
 		return new SecureRandom().nextInt(comprim);
 	}
 
-	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase) {
-		Font fntsis = new Font("Noto Sans", Font.BOLD, 200);
+	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita) {
+		Font fntsis = new Font("Noto Sans", Font.BOLD, 100);
 		Graphics grafimg = imgaleat.getGraphics();
+		FontMetrics inspetorfnt = grafimg.getFontMetrics(fntsis);
+		GlyphVector vetglifo = fntsis.createGlyphVector(inspetorfnt.getFontRenderContext(), frase);
+		float tamfntredimens = (float) manipularTamFnt(inspetorfnt, vetglifo, vetglifo.getOutline(0, 0), imgaleat,
+				fntsis);
+		if (tamfntredimens != 0) {
+			fntsis = fntsis.deriveFont(fntsis.getStyle(), tamfntredimens);
+			inspetorfnt = grafimg.getFontMetrics(fntsis);
+		}
+		int posX = calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
+				posY = LadoEditavelImg.BAIXO.toString().equals(ladovertescrita)
+						? imgaleat.getHeight() - inspetorfnt.getAscent()
+						: inspetorfnt.getAscent() * 2;
 		grafimg.setFont(fntsis);
 		grafimg.setColor(Color.BLACK);
-		grafimg.drawString(frase, 0, 200);
+		grafimg.drawString(frase, posX, posY);
 		return grafimg;
 	}
 
@@ -272,5 +287,25 @@ public class Main {
 	private static void gravarImgEmArq(BufferedImage imgmeme, File arqagravar) throws IOException {
 		ImageIO.write(imgmeme, "png", arqagravar);
 		System.out.printf("\nUm novo meme foi gravado com sucesso.\n");
+	}
+
+	private static double manipularTamFnt(FontMetrics inspetorfnt, GlyphVector vetglifo, Shape contorno,
+			BufferedImage imgamostra, Font fntsis) {
+		double largtxtnormal = contorno.getBounds().getWidth(), alturatxtnormal = contorno.getBounds().getHeight();
+		int largimg = imgamostra.getWidth();
+		int alturaimg = imgamostra.getHeight();
+		boolean margemconfortavel = largimg > largtxtnormal * 1.05 && alturaimg > alturatxtnormal * 1.05;
+		if (margemconfortavel)
+			return 0;
+		else {
+			double tamfntreflarg = (fntsis.getSize2D() * largimg) / largtxtnormal,
+					tamfntrefaltura = (fntsis.getSize2D() * alturaimg) / alturatxtnormal;
+			return (tamfntreflarg < tamfntrefaltura) ? tamfntreflarg : tamfntrefaltura;
+		}
+	}
+
+	private static int calcPosicHorizonLegend(int largimg, int largtxt) {
+		return new BigDecimal(largimg).subtract(new BigDecimal(largtxt)).divide(BigDecimal.TWO, RoundingMode.HALF_UP)
+				.intValue();
 	}
 }
