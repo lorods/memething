@@ -8,6 +8,7 @@ import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Scanner;
 
 import javax.imageio.ImageIO;
 import java.io.BufferedReader;
@@ -27,6 +28,10 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 public class Main {
+
+	enum OpcaoValidaMenu {
+		CRIARMEME, DEFINIRFNTNAMEM, DEFINIRCORFNTNAMEM, ENCERRARPROG
+	}
 
 	protected static class EncapsuladorEntradaEdicao {
 		private BufferedImage[] conjimg;
@@ -124,12 +129,17 @@ public class Main {
 		final int COMPRIM_MIN_ARG = 4;
 		final int COMPRIM_MAX_ARG = 6;
 		final int COMPRIM_REAL = args.length;
-		String razaoerro = aferirIntervaloComprimento(COMPRIM_MIN_ARG, COMPRIM_MAX_ARG, COMPRIM_REAL);
+		execOperacionalizacao(COMPRIM_MIN_ARG,COMPRIM_MAX_ARG,COMPRIM_REAL,args);
+	}
+
+	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args) throws IOException {
+		Scanner escaneadr = new Scanner(System.in);
+		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real);
 		if (razaoerro != null) {
 			System.out.printf("Erro: %s\n", razaoerro);
 			return;
 		}
-		EncapsuladorEntradaEdicao conjartefato = manipularComposicaoArg(args, COMPRIM_REAL);
+		EncapsuladorEntradaEdicao conjartefato = manipularComposicaoArg(args, comprim_real);
 		/*
 		 * System.out.
 		 * printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n"
@@ -148,6 +158,31 @@ public class Main {
 			manipularArqSaida(arqpescrita);
 			gravarImgEmArq(imgaleat, arqpescrita);
 		}
+		int selecaoescolhamenu;
+		do {
+			selecaoescolhamenu = encaminharOpcaoMenu(escaneadr);
+		} while (selecaoescolhamenu != -1);
+		escaneadr.close();
+	}
+
+	private static int encaminharOpcaoMenu(Scanner escaneadr) {
+		System.out.printf(
+				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
+		int selecaomenu = escaneadr.nextInt();
+		selecaomenu--;
+		if (selecaomenu == OpcaoValidaMenu.CRIARMEME.ordinal()) {
+
+		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRFNTNAMEM.ordinal()) {
+
+		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRCORFNTNAMEM.ordinal()) {
+
+		} else if (selecaomenu == OpcaoValidaMenu.ENCERRARPROG.ordinal()) {
+			System.out.printf("Opção inválida! Listando operações novamente...\n");
+			return -1;
+		} else {
+			return -2;
+		}
+		return selecaomenu;
 	}
 
 	private static String aferirIntervaloComprimento(int comprim_min, int comprim_max, int comprim_real) {
