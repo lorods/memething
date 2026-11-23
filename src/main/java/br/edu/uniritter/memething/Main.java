@@ -144,7 +144,7 @@ public class Main {
 			String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
 					.format(Instant.now());
 			String direscrita = conjartefato.getDirescrita();
-			File arqpescrita = new File(direscrita, "out/meme_".concat(seloatualdatahr).concat(".png"));
+			File arqpescrita = new File(direscrita, "../../editado/meme_".concat(seloatualdatahr).concat(".png"));
 			manipularArqSaida(arqpescrita);
 			gravarImgEmArq(imgaleat, arqpescrita);
 		}
