@@ -18,11 +18,14 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
+import java.awt.GraphicsEnvironment;
 import java.awt.Point;
 import java.awt.Shape;
 import java.awt.font.GlyphVector;
+import java.awt.font.TextAttribute;
 import java.io.File;
 import java.security.SecureRandom;
+import java.text.AttributedString;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -121,7 +124,7 @@ public class Main {
 
 	private static final String CAPTIONLSFLAG = "--captionls", IMGDIRFLAG = "--imgdir", EDITEDEDGEFLAG = "--edge";
 
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		final int COMPRIM_MIN_VETSTR = 1;
 		final int TAM_MAX_MB_ARQSTR = 100;
 		final int COMPRIM_MIN_VETIMG = 1;
@@ -132,7 +135,7 @@ public class Main {
 		execOperacionalizacao(COMPRIM_MIN_ARG,COMPRIM_MAX_ARG,COMPRIM_REAL,args);
 	}
 
-	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args) throws IOException {
+	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args) throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		Scanner escaneadr = new Scanner(System.in);
 		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real);
 		if (razaoerro != null) {
@@ -147,35 +150,45 @@ public class Main {
 		 * Arrays.toString(conjartefato.getConjlegend()),
 		 * conjartefato.getLadoedicaovert());
 		 */
-		if (conjartefato != null) {
-			BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
-			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()),
-					conjartefato.getLadoedicaovert());
-			String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
-					.format(Instant.now());
-			String direscrita = conjartefato.getDirescrita();
-			File arqpescrita = new File(direscrita, "../../editado/meme_".concat(seloatualdatahr).concat(".png"));
-			manipularArqSaida(arqpescrita);
-			gravarImgEmArq(imgaleat, arqpescrita);
-		}
 		int selecaoescolhamenu;
 		do {
-			selecaoescolhamenu = encaminharOpcaoMenu(escaneadr);
+			selecaoescolhamenu = encaminharOpcaoMenu(escaneadr,conjartefato);
 		} while (selecaoescolhamenu != -1);
 		escaneadr.close();
 	}
 
-	private static int encaminharOpcaoMenu(Scanner escaneadr) {
+	private static int encaminharOpcaoMenu(Scanner escaneadr, EncapsuladorEntradaEdicao conjartefato) throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
 		int selecaomenu = escaneadr.nextInt();
 		selecaomenu--;
+		AttributedString txtcomatr = new AttributedString(new String());
 		if (selecaomenu == OpcaoValidaMenu.CRIARMEME.ordinal()) {
-
+			if (conjartefato != null) {
+				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
+				Graphics ctxgrafimg = desenharStringEmImg(imgaleat, obterStringAleatoria(conjartefato.getConjlegend()),
+						conjartefato.getLadoedicaovert());
+				String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
+						.format(Instant.now());
+				String direscrita = conjartefato.getDirescrita();
+				File arqpescrita = new File(direscrita, "../../editado/meme_".concat(seloatualdatahr).concat(".png"));
+				manipularArqSaida(arqpescrita);
+				gravarImgEmArq(imgaleat, arqpescrita);
+			}
 		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRFNTNAMEM.ordinal()) {
-
+			System.out.printf("Insira ao lado o nome da fonte tipográfica para a legenda do meme (por exemplo, Arial): ");
+			String nomefamiliafnt = escaneadr.nextLine();
+			boolean fntdisponivel = aferirDisponibilidadeFnt(nomefamiliafnt);
+			if(!fntdisponivel) {
+				System.out.printf("A fonte que você informou não pôde ser carregada de seu sistema.\n");
+			}
+			else txtcomatr.addAttribute(TextAttribute.FAMILY,nomefamiliafnt);
 		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRCORFNTNAMEM.ordinal()) {
-
+			System.out.printf("Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, red): ");
+			String nomecorfnt = escaneadr.nextLine();
+			Color cordisponivel = procurarFntLocal(nomecorfnt);
+			if(cordisponivel==null) System.out.printf("A cor que você informou não pôde ser localizada.");
+			else txtcomatr.addAttribute(TextAttribute.FOREGROUND,cordisponivel);
 		} else if (selecaomenu == OpcaoValidaMenu.ENCERRARPROG.ordinal()) {
 			System.out.printf("Opção inválida! Listando operações novamente...\n");
 			return -1;
@@ -289,6 +302,15 @@ public class Main {
 
 	private static int obterIntAleatSegur(int comprim) {
 		return new SecureRandom().nextInt(comprim);
+	}
+	
+	private static boolean aferirDisponibilidadeFnt(String nomefamiliafnt) {
+		String[] bibfnt = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+		return Arrays.asList(bibfnt).contains(nomefamiliafnt);
+	}
+	
+	private static Color procurarFntLocal(String nomecorfnt) throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
+		return Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
 	}
 
 	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita) {
