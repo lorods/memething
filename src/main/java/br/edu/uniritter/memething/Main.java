@@ -38,26 +38,34 @@ public class Main {
 		CRIARMEME, DEFINIRFNTNAMEM, DEFINIRCORFNTNAMEM, ENCERRARPROG
 	}
 
-	protected static class EncapsuladorEntradaEdicao {
+	protected static class OperacaoComMeme {
 		private BufferedImage[] conjimg;
 		private String[] conjlegend;
 		private String ladoedicaovert, direscrita, nmarqescrit;
+		private boolean revisaoativ;
+		private File[] lsarq;
 
-		protected EncapsuladorEntradaEdicao() {
+		protected OperacaoComMeme() {
 
 		}
 
-		protected EncapsuladorEntradaEdicao(BufferedImage[] conjimg, String[] conjlegend) {
+		protected OperacaoComMeme(BufferedImage[] conjimg, String[] conjlegend) {
 			this.conjimg = conjimg;
 			this.conjlegend = conjlegend;
 		}
 
-		protected EncapsuladorEntradaEdicao(BufferedImage[] conjimg, String[] conjlegend, String ladoeditvert) {
+		protected OperacaoComMeme(boolean revisaoativ) {
+			this.revisaoativ = revisaoativ;
+		}
+
+		protected OperacaoComMeme(BufferedImage[] conjimg, String[] conjlegend, String ladoeditvert, String direscrita,
+				String nmarqescrit, boolean revisaoativ) {
 			this.conjimg = conjimg;
 			this.conjlegend = conjlegend;
 			this.ladoedicaovert = ladoeditvert;
 			this.direscrita = direscrita;
 			this.nmarqescrit = nmarqescrit;
+			this.revisaoativ = revisaoativ;
 		}
 
 		protected BufferedImage[] getConjimg() {
@@ -99,6 +107,22 @@ public class Main {
 		protected void setNmarqescrit(String nmarqescrit) {
 			this.nmarqescrit = nmarqescrit;
 		}
+
+		protected boolean temRevisaoativ() {
+			return revisaoativ;
+		}
+
+		protected void setRevisaoativ(boolean revisaoativ) {
+			this.revisaoativ = revisaoativ;
+		}
+
+		protected File[] getLsarq() {
+			return lsarq;
+		}
+
+		protected void setLsarq(File[] lsarq) {
+			this.lsarq = lsarq;
+		}
 	}
 
 	enum LadoEditavelImg {
@@ -124,7 +148,8 @@ public class Main {
 	 * mínimo quatro argumentos conhecidos e no máximo seis argumentos conhecidos
 	 */
 
-	private static final String CAPTIONLSFLAG = "--captionls", IMGDIRFLAG = "--imgdir", EDITEDEDGEFLAG = "--edge";
+	private static final String CAPTIONLSFLAG = "--captionls", IMGDIRFLAG = "--imgdir", EDITEDEDGEFLAG = "--edge",
+			REVIEWMODEFLAG = "--reviewtime", HELPFLAG = "--help";
 
 	public static void main(String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
@@ -140,13 +165,18 @@ public class Main {
 
 	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+		if (Arrays.asList(args).contains(HELPFLAG)) {
+			System.out.printf(
+					"===Ajuda do programa===\nAbaixo, colchetes denotam um parâmetro facultativo:\n\n--imgdir <caminho>\tpasta que contém as imagens de amostra, uma sorteada por meme\n--captionls <caminho>\tarquivo com strings para a legenda separadas por ponto e vírgula\n[--edge <top|bottom>]\to lado vertical próximo do qual a legenda deve ser inserida\n[--reviewtime]\tperguntar se o valor sorteado deve ser descartado ou usado\n[--help]\texibir esta mensagem de ajuda e encerrar");
+			return;
+		}
 		Scanner escaneadr = new Scanner(System.in);
 		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real);
 		if (razaoerro != null) {
 			System.out.printf("Erro: %s\n", razaoerro);
 			return;
 		}
-		EncapsuladorEntradaEdicao conjartefato = manipularComposicaoArg(args, comprim_real);
+		OperacaoComMeme conjartefato = manipularComposicaoArg(args, comprim_real);
 		/*
 		 * System.out.
 		 * printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n"
@@ -162,8 +192,7 @@ public class Main {
 		escaneadr.close();
 	}
 
-	private static int encaminharOpcaoMenu(Scanner escaneadr, EncapsuladorEntradaEdicao conjartefato,
-			AttributedString txtcomatr)
+	private static int encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato, AttributedString txtcomatr)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
@@ -172,8 +201,10 @@ public class Main {
 		if (selecaomenu == OpcaoValidaMenu.CRIARMEME.ordinal()) {
 			if (conjartefato != null) {
 				Map<Attribute, Object> conjatr = txtcomatr.getIterator().getAttributes();
-				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg());
-				String frasesel = obterStringAleatoria(conjartefato.getConjlegend());
+				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg(), conjartefato.getLsarq(),
+						conjartefato.temRevisaoativ(), escaneadr);
+				String frasesel = obterFraseAleatoria(conjartefato.getConjlegend(), conjartefato.temRevisaoativ(),
+						escaneadr);
 				txtcomatr = new AttributedString(frasesel);
 				txtcomatr.addAttributes(conjatr, 0, frasesel.length());
 				Graphics ctxgrafimg = desenharStringEmImg(imgaleat, frasesel, conjartefato.getLadoedicaovert(),
@@ -225,17 +256,20 @@ public class Main {
 		return razaoretornocomp;
 	}
 
-	private static EncapsuladorEntradaEdicao manipularComposicaoArg(String[] lsarg, int comprim_real)
-			throws IOException {
+	private static OperacaoComMeme manipularComposicaoArg(String[] lsarg, int comprim_real) throws IOException {
 		boolean argtemarqfrase = false, argtemdirimg = false, ladoedicaoestadef = false, conjargestasuficiente = false;
 		BufferedImage[] conjimg = new BufferedImage[0];
 		String[] conjlegend = new String[0];
 		String ladoedicaovert = new String();
-		EncapsuladorEntradaEdicao conjartefretornado = new EncapsuladorEntradaEdicao();
+		OperacaoComMeme conjartefretornado = Arrays.asList(lsarg).contains(REVIEWMODEFLAG) ? new OperacaoComMeme(true)
+				: new OperacaoComMeme(false);
+		File[] lsarq = new File[0];
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
 				if (lsarg[(i - 1)].equals(IMGDIRFLAG) && new File(lsarg[i]).isDirectory()) {
-					conjimg = validarImgEmDir(lsarg[i]);
+					File dirimg = new File(lsarg[i]);
+					lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
+					conjimg = validarImgEmDir(dirimg, lsarq);
 					for (int j = 0; j < conjimg.length; j++) {
 						System.out.printf("\nOpacidade da imagem: %d\n", conjimg[j].getTransparency());
 					}
@@ -261,6 +295,7 @@ public class Main {
 				}
 			}
 			if (argtemdirimg && argtemarqfrase) {
+				conjartefretornado.setLsarq(lsarq);
 				conjartefretornado.setConjimg(conjimg);
 				conjartefretornado.setConjlegend(conjlegend);
 
@@ -278,9 +313,7 @@ public class Main {
 		return conjartefretornado;
 	}
 
-	private static BufferedImage[] validarImgEmDir(String caminhodir) throws IOException {
-		File dirimg = new File(caminhodir);
-		File[] lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
+	private static BufferedImage[] validarImgEmDir(File dirimg, File[] lsarq) throws IOException {
 		BufferedImage[] conjimg = new BufferedImage[0];
 		for (int i = 0; i < lsarq.length; i++) {
 			if (ImageIO.read(lsarq[i]) != null) {
@@ -309,20 +342,44 @@ public class Main {
 		return conjlegend;
 	}
 
-	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg) {
-        BufferedImage imgorig = conjamostraimg[obterIntAleatSegur(conjamostraimg.length)];
-        BufferedImage imgcopia = new BufferedImage(
-                imgorig.getWidth(),
-                imgorig.getHeight(),
-                imgorig.getType() != 0 ? imgorig.getType() : BufferedImage.TYPE_INT_ARGB);
-        Graphics g = imgcopia.createGraphics();
-        g.drawImage(imgorig, 0, 0, null);
-        g.dispose();
-        return imgcopia;
+	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg, File[] lsarq, boolean revisaoativ,
+			Scanner escaneadr) {
+		int aleatsegur;
+		for (;;) {
+			aleatsegur = obterIntAleatSegur(conjamostraimg.length);
+			if (revisaoativ) {
+				System.out.printf("A imagem aleatória selecionada está no caminho "
+						.concat(lsarq[aleatsegur].getAbsolutePath())
+						.concat(". Você deseja continuar com ela? Digite \"não\" se não quiser, caso contrário \"sim\" ou qualquer outro valor: "));
+				String decisaorev = escaneadr.nextLine();
+				if (!decisaorev.toLowerCase().equals("não"))
+					break;
+			} else
+				break;
+		}
+		BufferedImage imgorig = conjamostraimg[aleatsegur];
+		BufferedImage imgcopia = new BufferedImage(imgorig.getWidth(), imgorig.getHeight(),
+				imgorig.getType() != 0 ? imgorig.getType() : BufferedImage.TYPE_INT_ARGB);
+		Graphics g = imgcopia.createGraphics();
+		g.drawImage(imgorig, 0, 0, null);
+		g.dispose();
+		return imgcopia;
 	}
 
-	private static String obterStringAleatoria(String[] conjlegend) {
-		return conjlegend[obterIntAleatSegur(conjlegend.length)];
+	private static String obterFraseAleatoria(String[] conjlegend, boolean revisaoativ, Scanner escaneadr) {
+		int aleatsegur;
+		for (;;) {
+			aleatsegur = obterIntAleatSegur(conjlegend.length);
+			if (revisaoativ) {
+				System.out.printf("A frase aleatória selecionada é ".concat(conjlegend[aleatsegur]).concat(
+						". Você deseja continuar com ela? Digite \"não\" se não quiser, caso contrário \"sim\" ou qualquer outro valor: "));
+				String decisaorev = escaneadr.nextLine();
+				if (!decisaorev.toLowerCase().equals("não"))
+					break;
+			} else
+				break;
+		}
+		return conjlegend[aleatsegur];
 	}
 
 	private static int obterIntAleatSegur(int comprim) {
