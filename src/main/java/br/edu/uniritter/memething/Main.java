@@ -162,7 +162,8 @@ public class Main {
 		escaneadr.close();
 	}
 
-	private static int encaminharOpcaoMenu(Scanner escaneadr, EncapsuladorEntradaEdicao conjartefato, AttributedString txtcomatr)
+	private static int encaminharOpcaoMenu(Scanner escaneadr, EncapsuladorEntradaEdicao conjartefato,
+			AttributedString txtcomatr)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
@@ -348,16 +349,16 @@ public class Main {
 		}
 		if (atrtxt != null)
 			atrtxt.addAttribute(TextAttribute.FONT, fntsis);
-		int posX = calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
-				posY = LadoEditavelImg.BAIXO.toString().equals(ladovertescrita)
+		int[][] postxt = new int[][] { { calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
+				LadoEditavelImg.BAIXO.toString().equals(ladovertescrita)
 						? imgaleat.getHeight() - inspetorfnt.getAscent()
-						: inspetorfnt.getAscent() * 2;
+						: inspetorfnt.getAscent() * 2 } };
 		grafimg.setFont(fntsis);
 		grafimg.setColor(Color.BLACK);
 		if (atrtxt == null) {
-			grafimg.drawString(frase, posX, posY);
+			grafimg.drawString(frase, postxt[0][0], postxt[0][1]);
 		} else {
-			grafimg.drawString(atrtxt.getIterator(), posX, posY);
+			grafimg.drawString(atrtxt.getIterator(), postxt[0][0], postxt[0][1]);
 		}
 		return grafimg;
 	}
