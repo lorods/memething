@@ -184,6 +184,7 @@ public class Main {
 				File arqpescrita = new File(direscrita, "../../editado/meme_".concat(seloatualdatahr).concat(".png"));
 				manipularArqSaida(arqpescrita);
 				gravarImgEmArq(imgaleat, arqpescrita);
+				ctxgrafimg.dispose();
 			}
 		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRFNTNAMEM.ordinal()) {
 			System.out
@@ -309,7 +310,15 @@ public class Main {
 	}
 
 	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg) {
-		return conjamostraimg[obterIntAleatSegur(conjamostraimg.length)];
+        BufferedImage imgorig = conjamostraimg[obterIntAleatSegur(conjamostraimg.length)];
+        BufferedImage imgcopia = new BufferedImage(
+                imgorig.getWidth(),
+                imgorig.getHeight(),
+                imgorig.getType() != 0 ? imgorig.getType() : BufferedImage.TYPE_INT_ARGB);
+        Graphics g = imgcopia.createGraphics();
+        g.drawImage(imgorig, 0, 0, null);
+        g.dispose();
+        return imgcopia;
 	}
 
 	private static String obterStringAleatoria(String[] conjlegend) {
@@ -371,6 +380,7 @@ public class Main {
 	}
 
 	private static void gravarImgEmArq(BufferedImage imgmeme, File arqagravar) throws IOException {
+		System.out.printf("Prestes a gravar...");
 		ImageIO.write(imgmeme, "png", arqagravar);
 		System.out.printf("\nUm novo meme foi gravado com sucesso.\n");
 	}
