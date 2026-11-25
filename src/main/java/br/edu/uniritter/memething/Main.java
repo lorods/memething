@@ -35,7 +35,7 @@ import java.time.format.DateTimeFormatter;
 public class Main {
 
 	enum OpcaoValidaMenu {
-		CRIARMEME, DEFINIRFNTNAMEM, DEFINIRCORFNTNAMEM, ENCERRARPROG
+		CRIARMEME, DEFINIRFNTNAMEM, DEFINIRCORFNTNAMEM, ENCERRARPROG, INVALIDA
 	}
 
 	protected static class OperacaoComMeme {
@@ -148,24 +148,20 @@ public class Main {
 	 * mínimo quatro argumentos conhecidos e no máximo seis argumentos conhecidos
 	 */
 
-	private static final String CAPTIONLSFLAG = "--captionls", IMGDIRFLAG = "--imgdir", EDITEDEDGEFLAG = "--edge",
-			REVIEWMODEFLAG = "--reviewtime", HELPFLAG = "--help";
+	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
+			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help";
+	private static final int COMPRIM_MIN_VETSTR = 1, TAM_MAX_MB_ARQSTR = 100, COMPRIM_MIN_VETIMG = 1,
+			TAM_MAX_MB_DIRIMG = 500, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 6;
 
 	public static void main(String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
-		final int COMPRIM_MIN_VETSTR = 1;
-		final int TAM_MAX_MB_ARQSTR = 100;
-		final int COMPRIM_MIN_VETIMG = 1;
-		final int TAM_MAX_MB_DIRIMG = 500;
-		final int COMPRIM_MIN_ARG = 4;
-		final int COMPRIM_MAX_ARG = 6;
 		final int COMPRIM_REAL = args.length;
 		execOperacionalizacao(COMPRIM_MIN_ARG, COMPRIM_MAX_ARG, COMPRIM_REAL, args);
 	}
 
 	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
-		if (Arrays.asList(args).contains(HELPFLAG)) {
+		if (Arrays.asList(args).contains(HELP_FLAG)) {
 			System.out.printf(
 					"===Ajuda do programa===\nAbaixo, colchetes denotam um parâmetro facultativo:\n\n--imgdir <caminho>\tpasta que contém as imagens de amostra, uma sorteada por meme\n--captionls <caminho>\tarquivo com strings para a legenda separadas por ponto e vírgula\n[--edge <top|bottom>]\to lado vertical próximo do qual a legenda deve ser inserida\n[--reviewtime]\tperguntar se o valor sorteado deve ser descartado ou usado\n[--help]\texibir esta mensagem de ajuda e encerrar");
 			return;
@@ -198,7 +194,11 @@ public class Main {
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
 		int selecaomenu = escaneadr.nextInt();
 		selecaomenu--;
-		if (selecaomenu == OpcaoValidaMenu.CRIARMEME.ordinal()) {
+		OpcaoValidaMenu[] conjopc = OpcaoValidaMenu.values();
+		OpcaoValidaMenu opcao = (selecaomenu >= 0 && selecaomenu < (conjopc.length - 1)) ? conjopc[selecaomenu]
+				: OpcaoValidaMenu.INVALIDA;
+		switch (opcao) {
+		case CRIARMEME -> {
 			if (conjartefato != null) {
 				Map<Attribute, Object> conjatr = txtcomatr.getIterator().getAttributes();
 				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg(), conjartefato.getLsarq(),
@@ -217,7 +217,8 @@ public class Main {
 				gravarImgEmArq(imgaleat, arqpescrita);
 				ctxgrafimg.dispose();
 			}
-		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRFNTNAMEM.ordinal()) {
+		}
+		case DEFINIRFNTNAMEM -> {
 			System.out
 					.printf("Insira ao lado o nome da fonte tipográfica para a legenda do meme (por exemplo, Arial): ");
 			escaneadr.nextLine();
@@ -227,7 +228,8 @@ public class Main {
 				System.out.printf("A fonte que você informou não pôde ser carregada de seu sistema.\n");
 			} else
 				txtcomatr.addAttribute(TextAttribute.FAMILY, nomefamiliafnt);
-		} else if (selecaomenu == OpcaoValidaMenu.DEFINIRCORFNTNAMEM.ordinal()) {
+		}
+		case DEFINIRCORFNTNAMEM -> {
 			System.out.printf(
 					"Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, red): ");
 			escaneadr.nextLine();
@@ -237,11 +239,14 @@ public class Main {
 				System.out.printf("A cor que você informou não pôde ser localizada.");
 			else
 				txtcomatr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
-		} else if (selecaomenu == OpcaoValidaMenu.ENCERRARPROG.ordinal()) {
-			System.out.printf("Opção inválida! Listando operações novamente...\n");
+		}
+		case ENCERRARPROG -> {
 			return -1;
-		} else {
+		}
+		default -> {
+			System.out.printf("Opção inválida! Listando operações novamente...\n");
 			return -2;
+		}
 		}
 		return selecaomenu;
 	}
@@ -261,12 +266,12 @@ public class Main {
 		BufferedImage[] conjimg = new BufferedImage[0];
 		String[] conjlegend = new String[0];
 		String ladoedicaovert = new String();
-		OperacaoComMeme conjartefretornado = Arrays.asList(lsarg).contains(REVIEWMODEFLAG) ? new OperacaoComMeme(true)
+		OperacaoComMeme conjartefretornado = Arrays.asList(lsarg).contains(REVIEW_MODE_FLAG) ? new OperacaoComMeme(true)
 				: new OperacaoComMeme(false);
 		File[] lsarq = new File[0];
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
-				if (lsarg[(i - 1)].equals(IMGDIRFLAG) && new File(lsarg[i]).isDirectory()) {
+				if (lsarg[(i - 1)].equals(IMG_DIR_FLAG) && new File(lsarg[i]).isDirectory()) {
 					File dirimg = new File(lsarg[i]);
 					lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
 					conjimg = validarImgEmDir(dirimg, lsarq);
@@ -290,7 +295,7 @@ public class Main {
 			}
 
 			if (!argtemarqfrase) {
-				if (lsarg[(i - 1)].equals(CAPTIONLSFLAG) && new File(lsarg[i]).isFile()) {
+				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG) && new File(lsarg[i]).isFile()) {
 					conjlegend = validarArqFrase(lsarg[i]);
 					System.out.printf("Strings de frases: %s.\n\n", Arrays.toString(conjlegend));
 					argtemarqfrase = true;
@@ -298,7 +303,7 @@ public class Main {
 			}
 
 			if (!ladoedicaoestadef) {
-				if (lsarg[(i - 1)].equals(EDITEDEDGEFLAG)) {
+				if (lsarg[(i - 1)].equals(EDITED_EDGE_FLAG)) {
 					ladoedicaovert = lsarg[i].equals(LadoEditavelImg.BAIXO.toString())
 							? LadoEditavelImg.BAIXO.toString()
 							: LadoEditavelImg.TOPO.toString();
@@ -426,16 +431,16 @@ public class Main {
 		}
 		if (atrtxt != null)
 			atrtxt.addAttribute(TextAttribute.FONT, fntsis);
-		int[][] postxt = new int[][] { { calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
+		int[] postxt = new int[] { calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
 				LadoEditavelImg.BAIXO.toString().equals(ladovertescrita)
 						? imgaleat.getHeight() - inspetorfnt.getAscent()
-						: inspetorfnt.getAscent() * 2 } };
+						: inspetorfnt.getAscent() * 2 };
 		grafimg.setFont(fntsis);
 		grafimg.setColor(Color.BLACK);
 		if (atrtxt == null) {
-			grafimg.drawString(frase, postxt[0][0], postxt[0][1]);
+			grafimg.drawString(frase, postxt[0], postxt[1]);
 		} else {
-			grafimg.drawString(atrtxt.getIterator(), postxt[0][0], postxt[0][1]);
+			grafimg.drawString(atrtxt.getIterator(), postxt[0], postxt[1]);
 		}
 		return grafimg;
 	}
