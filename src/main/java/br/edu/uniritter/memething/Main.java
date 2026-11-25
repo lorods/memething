@@ -5,6 +5,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
@@ -20,6 +21,7 @@ import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.GraphicsEnvironment;
+import java.util.List;
 import java.awt.Point;
 import java.awt.Shape;
 import java.awt.font.GlyphVector;
@@ -142,16 +144,17 @@ public class Main {
 
 	/*
 	 * Regras de negócio: 1: Processar ao menos uma string do arquivo com frases de
-	 * legenda e no máximo 100 MB do arquivo, caso contrário pular restantes 2:
-	 * Processar ao menos uma imagem do caminho fornecido como argumento e no máximo
-	 * uma pasta com 500 MB em imagens, caso contrário pular restantes 3: Receber no
-	 * mínimo quatro argumentos conhecidos e no máximo seis argumentos conhecidos
+	 * legenda e no máximo 32 KB do arquivo, caso contrário pular restantes 2:
+	 * Processar uma imagem com no mínimo x bytes e no máximo 
+	 * com 5000 KB, caso contrário pulá-la 3: Receber no mínimo quatro
+	 * argumentos conhecidos e no máximo seis argumentos conhecidos
 	 */
 
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
 			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help";
-	private static final int COMPRIM_MIN_VETSTR = 1, TAM_MAX_MB_ARQSTR = 100, COMPRIM_MIN_VETIMG = 1,
-			TAM_MAX_MB_DIRIMG = 500, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 6;
+	private static final int COMPRIM_MIN_VETSTR = 1, TAM_MAX_KB_ARQ_STR = Integer.SIZE, COMPRIM_MIN_VETIMG = 1,
+			COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 6;
+	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000);
 
 	public static void main(String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
@@ -269,6 +272,8 @@ public class Main {
 		OperacaoComMeme conjartefretornado = Arrays.asList(lsarg).contains(REVIEW_MODE_FLAG) ? new OperacaoComMeme(true)
 				: new OperacaoComMeme(false);
 		File[] lsarq = new File[0];
+		int[] indrm = new int[0];
+		BigDecimal[][] lsprop = new BigDecimal[conjimg.length][2];
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
 				if (lsarg[(i - 1)].equals(IMG_DIR_FLAG) && new File(lsarg[i]).isDirectory()) {
@@ -276,19 +281,25 @@ public class Main {
 					lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
 					conjimg = validarImgEmDir(dirimg, lsarq);
 					System.out.printf("O PROGRAMA FOI CARREGADO COM OS SEGUINTES ARQUIVOS E SUAS PROPRIEDADES:\n");
-					String[][] lsprop = new String[conjimg.length][3];
 					for (int j = 0; j < conjimg.length; j++) {
-						lsprop[j][0] = new String("Caminho da imagem no sistema: ").concat(lsarq[j].getAbsolutePath())
-								.concat("\n");
-						lsprop[j][1] = new String("Largura da imagem em pixels: ")
-								.concat(String.valueOf(conjimg[j].getWidth()).concat("\n"));
-						lsprop[j][2] = new String("Altura da imagem em pixels: ")
-								.concat(String.valueOf(conjimg[j].getHeight())).concat("\n");
-						for (int k = 0; k <= 2; k++) {
-							System.out.printf(lsprop[j][k]);
+						lsprop[j][0] = new BigDecimal(lsarq[j].length()).divide(new BigDecimal(1024 * 1024));
+						if (lsprop[j][0].compareTo(TAM_MAX_KB_ARQ_IMG) == 1) {
+							System.out.printf(
+									"O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s). Ele não será sorteado como base de meme.\n",
+									lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
+							indrm = indrm.length == 0 ? new int[1] : Arrays.copyOf(indrm, (indrm.length + 1));
 						}
-						System.out.printf("\n");
 					}
+					int k = 0;
+					List<File> lsauxarq = Arrays.asList(lsarq);
+					List<BufferedImage> lsauximg = Arrays.asList(conjimg);
+					for (int j = 0; j < indrm.length; j++) {
+						lsauxarq.remove(indrm[j] - k);
+						lsauximg.remove(indrm[j] - k);
+						k++;
+					}
+					lsarq = File[].class.cast(lsauxarq.toArray());
+					conjimg = BufferedImage[].class.cast(lsauximg.toArray());
 					argtemdirimg = true;
 					conjartefretornado.setDirescrita(lsarg[i]);
 				}
