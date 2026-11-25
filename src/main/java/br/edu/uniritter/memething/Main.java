@@ -270,8 +270,19 @@ public class Main {
 					File dirimg = new File(lsarg[i]);
 					lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
 					conjimg = validarImgEmDir(dirimg, lsarq);
+					System.out.printf("O PROGRAMA FOI CARREGADO COM OS SEGUINTES ARQUIVOS E SUAS PROPRIEDADES:\n");
+					String[][] lsprop = new String[conjimg.length][3];
 					for (int j = 0; j < conjimg.length; j++) {
-						System.out.printf("\nOpacidade da imagem: %d\n", conjimg[j].getTransparency());
+						lsprop[j][0] = new String("Caminho da imagem no sistema: ").concat(lsarq[j].getAbsolutePath())
+								.concat("\n");
+						lsprop[j][1] = new String("Largura da imagem em pixels: ")
+								.concat(String.valueOf(conjimg[j].getWidth()).concat("\n"));
+						lsprop[j][2] = new String("Altura da imagem em pixels: ")
+								.concat(String.valueOf(conjimg[j].getHeight())).concat("\n");
+						for (int k = 0; k <= 2; k++) {
+							System.out.printf(lsprop[j][k]);
+						}
+						System.out.printf("\n");
 					}
 					argtemdirimg = true;
 					conjartefretornado.setDirescrita(lsarg[i]);
@@ -281,7 +292,7 @@ public class Main {
 			if (!argtemarqfrase) {
 				if (lsarg[(i - 1)].equals(CAPTIONLSFLAG) && new File(lsarg[i]).isFile()) {
 					conjlegend = validarArqFrase(lsarg[i]);
-					System.out.printf("Strings de frases: %s.", Arrays.toString(conjlegend));
+					System.out.printf("Strings de frases: %s.\n\n", Arrays.toString(conjlegend));
 					argtemarqfrase = true;
 				}
 			}
@@ -437,7 +448,6 @@ public class Main {
 	}
 
 	private static void gravarImgEmArq(BufferedImage imgmeme, File arqagravar) throws IOException {
-		System.out.printf("Prestes a gravar...");
 		ImageIO.write(imgmeme, "png", arqagravar);
 		System.out.printf("\nUm novo meme foi gravado com sucesso.\n");
 	}
