@@ -1,28 +1,21 @@
 package br.edu.uniritter.memething;
 
-import java.io.DataOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Date;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 
 import javax.imageio.ImageIO;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.GraphicsEnvironment;
-import java.util.List;
-import java.awt.Point;
 import java.awt.Shape;
 import java.awt.font.GlyphVector;
 import java.awt.font.TextAttribute;
@@ -127,6 +120,18 @@ public class Main {
 		}
 	}
 
+	protected static class AtrPersonalizado extends Attribute {
+		/**
+		 * 
+		 */
+		private static final long serialVersionUID = 1L;
+		private static final AtrPersonalizado CORFNT = new AtrPersonalizado("corfonte");
+
+		protected AtrPersonalizado(String corfnt) {
+			super(corfnt);
+		}
+	}
+
 	enum LadoEditavelImg {
 		TOPO {
 			@Override
@@ -154,9 +159,11 @@ public class Main {
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
 			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help";
 	private static final int COMPRIM_MIN_VETSTR = 1, COMPRIM_MIN_VETIMG = 1, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 7;
+	private static final double FATOR_MARG = 1.05;
 	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000),
 			TAM_MIN_KB_ARQ_IMG = new BigDecimal("0.008"), TAM_MAX_KB_ARQ_STR = new BigDecimal(Integer.SIZE),
 			TAM_MIN_KB_ARQ_STR = new BigDecimal("0.002"), FATR_B_CONVERSAO = new BigDecimal(1000);
+	private static OperacaoComMeme conjartefato;
 
 	public static void main(String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
@@ -178,7 +185,7 @@ public class Main {
 			System.out.printf("[ERRO FATAL] %s\n", razaoerro);
 			return;
 		}
-		OperacaoComMeme conjartefato = manipularComposicaoArg(args, comprim_real);
+		conjartefato = manipularComposicaoArg(args, comprim_real);
 		short selecaoescolhamenu = 0;
 		AttributedString txtcomatr = new AttributedString(new String("-"));
 		if (conjartefato == null)
@@ -194,7 +201,13 @@ public class Main {
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
-		short selecaomenu = escaneadr.nextShort();
+		byte selecaomenu = 0;
+		while (!escaneadr.hasNextByte()) {
+			System.out.printf("Entrada inválida! Digite um número inteiro correspondente à opção (1–4): ");
+			escaneadr.next(); // descarta a palavra/letra inválida do buffer para não entrar em loop infinito
+		}
+		selecaomenu = escaneadr.nextByte();
+		escaneadr.nextLine(); // consome a quebra de linha (\n) após o número
 		selecaomenu--;
 		OpcaoValidaMenu[] conjopc = OpcaoValidaMenu.values();
 		OpcaoValidaMenu opcao = (selecaomenu >= 0 && selecaomenu < (conjopc.length - 1)) ? conjopc[selecaomenu]
@@ -203,6 +216,12 @@ public class Main {
 		case CRIARMEME -> {
 			if (conjartefato != null) {
 				Map<Attribute, Object> conjatr = txtcomatr.getIterator().getAttributes();
+				Object familiafntusuario = conjatr.get(TextAttribute.FAMILY),
+						corfntusuario = conjatr.get(AtrPersonalizado.CORFNT);
+				System.out.printf(
+						"===CONFIGURAÇÕES ATUAIS===\nFonte tipográfica: %s\nCor da fonte da legenda (em inglês): %s.\n",
+						familiafntusuario != null ? familiafntusuario.toString() : "padrão do sistema",
+						corfntusuario != null ? corfntusuario.toString() : "padrão do sistema");
 				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg(), conjartefato.getLsarq(),
 						conjartefato.temRevisaoativ(), escaneadr);
 				String frasesel = obterFraseAleatoria(conjartefato.getConjlegend(), conjartefato.temRevisaoativ(),
@@ -223,7 +242,6 @@ public class Main {
 		case DEFINIRFNTNAMEM -> {
 			System.out
 					.printf("Insira ao lado o nome da fonte tipográfica para a legenda do meme (por exemplo, Arial): ");
-			escaneadr.nextLine();
 			String nomefamiliafnt = escaneadr.nextLine();
 			boolean fntdisponivel = aferirDisponibilidadeFnt(nomefamiliafnt);
 			if (!fntdisponivel) {
@@ -233,14 +251,16 @@ public class Main {
 		}
 		case DEFINIRCORFNTNAMEM -> {
 			System.out.printf(
-					"Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, red): ");
-			escaneadr.nextLine();
+					"Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, \"red\"): ");
 			String nomecorfnt = escaneadr.nextLine();
 			Color cordisponivel = procurarFntLocal(nomecorfnt);
 			if (cordisponivel == null)
-				System.out.printf("A cor que você informou não pôde ser localizada.");
-			else
+				System.out.printf(
+						"A cor que você informou não pôde ser localizada. Certifique-se de escrever a cor em inglês.\n");
+			else {
+				txtcomatr.addAttribute(AtrPersonalizado.CORFNT, nomecorfnt);
 				txtcomatr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
+			}
 		}
 		case ENCERRARPROG -> {
 			System.out.printf("Encerramento solicitado.");
@@ -299,16 +319,15 @@ public class Main {
 					boolean temdir = new File(lsarg[i]).isDirectory();
 					if (temdir) {
 						File dirimg = new File(lsarg[i]);
-						boolean temimgemdir = aferirItemFilho(dirimg);
-						if (!temimgemdir) {
+						lsarq = aferirItemFilho(dirimg);
+						if (lsarq.length == 0) {
 							System.out.printf(
 									"[ERRO FATAL] Não existe nenhum arquivo na pasta informada. É necessário pelo menos um arquivo que seja uma imagem.");
 							break;
 						}
-						lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
 						BigDecimal[][] lsprop = new BigDecimal[lsarq.length][2];
 						for (int j = 0; j < lsarq.length; j++) {
-							lsprop[j][0] = new BigDecimal(lsarq[j].length()).divide(new BigDecimal(1000));
+							lsprop[j][0] = new BigDecimal(lsarq[j].length()).divide(FATR_B_CONVERSAO);
 							if (lsprop[j][0].compareTo(TAM_MAX_KB_ARQ_IMG) == 1) {
 								System.out.printf(
 										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n",
@@ -326,6 +345,8 @@ public class Main {
 						}
 						System.out.printf("\n");
 						conjimg = validarImgEmDir(dirimg, lsarqutil);
+						if (lsarqutil.length != conjartefato.getLsarq().length)
+							lsarqutil = conjartefretornado.getLsarq();
 						for (short j = 0; j < conjimg.length; j++) {
 							System.out.printf("%s carregado com sucesso.\n", lsarqutil[j].getAbsolutePath());
 						}
@@ -385,22 +406,26 @@ public class Main {
 		return conjartefretornado;
 	}
 
-	private static boolean aferirItemFilho(File dirimg) {
-		return dirimg.listFiles().length > COMPRIM_MIN_VETIMG;
+	private static File[] aferirItemFilho(File dirimg) {
+		return dirimg.listFiles((dir, name) -> !name.equals("out"));
 	}
 
 	private static BufferedImage[] validarImgEmDir(File dirimg, File[] lsarq) throws IOException {
 		BufferedImage[] conjimg = new BufferedImage[0];
 		for (int i = 0; i < lsarq.length; i++) {
 			if (ImageIO.read(lsarq[i]) != null) {
-				if (conjimg.length == 0)
+				if (conjimg.length == 0) {
 					conjimg = new BufferedImage[] { ImageIO.read(lsarq[i]) };
-				else {
+				} else {
 					conjimg = Arrays.copyOf(conjimg, (conjimg.length + 1));
 					conjimg[(conjimg.length - 1)] = ImageIO.read(lsarq[i]);
 				}
+			} else {
+				lsarq = Arrays.copyOfRange(lsarq, 0, i);
 			}
 		}
+		if (conjimg.length != lsarq.length)
+			conjartefato.setLsarq(lsarq);
 		return conjimg;
 	}
 
@@ -421,7 +446,7 @@ public class Main {
 		BufferedReader leitorsegmnt = new BufferedReader(leitorarq);
 		int ctdrocorrencia = 0, ind = 0;
 		if (temcorte) {
-			char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue() * 1000)];
+			char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue() * FATR_B_CONVERSAO.intValue())];
 			int leiturab = leitorsegmnt.read(bufferLimitd, 0, bufferLimitd.length);
 			String legendtrunc = new String(bufferLimitd, 0, leiturab);
 			int ultimaDelimit = legendtrunc.lastIndexOf(DELIMIT_FRASE);
@@ -462,7 +487,6 @@ public class Main {
 	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg, File[] lsarq, boolean revisaoativ,
 			Scanner escaneadr) {
 		int aleatsegur;
-		escaneadr.nextLine();
 		for (;;) {
 			aleatsegur = obterIntAleatSegur(conjamostraimg.length);
 			if (revisaoativ) {
@@ -511,7 +535,11 @@ public class Main {
 
 	private static Color procurarFntLocal(String nomecorfnt)
 			throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
-		return Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
+		try {
+			return Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
+		} catch (NoSuchFieldException nsfe) {
+			return null;
+		}
 	}
 
 	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita,
@@ -562,12 +590,10 @@ public class Main {
 
 	private static double manipularTamFnt(FontMetrics inspetorfnt, GlyphVector vetglifo, Shape contorno,
 			BufferedImage imgamostra, Font fntsis) {
-		final double proporcaomarg = 1.05;
 		double largtxtnormal = contorno.getBounds().getWidth(), alturatxtnormal = contorno.getBounds().getHeight();
 		int largimg = imgamostra.getWidth();
 		int alturaimg = imgamostra.getHeight();
-		boolean margemconfortavel = largimg > largtxtnormal * proporcaomarg
-				&& alturaimg > alturatxtnormal * proporcaomarg;
+		boolean margemconfortavel = largimg > largtxtnormal * FATOR_MARG && alturaimg > alturatxtnormal * FATOR_MARG;
 		if (margemconfortavel)
 			return 0;
 		else {
@@ -589,7 +615,7 @@ public class Main {
 		StringBuilder constrstr = new StringBuilder();
 		for (int i = 0; i < iMax; i++) {
 			constrstr.append(String.valueOf(conjlegend[i]));
-			constrstr.append(i == (iMax - 1) ? "." : ", ");
+			constrstr.append(i == (iMax - 1) ? "." : "; ");
 		}
 		return constrstr.toString();
 	}
