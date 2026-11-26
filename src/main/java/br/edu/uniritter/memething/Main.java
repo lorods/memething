@@ -143,18 +143,20 @@ public class Main {
 	}
 
 	/*
-	 * Regras de negócio: 1: Processar ao menos uma string do arquivo com frases de
-	 * legenda e no máximo 32 KB do arquivo, caso contrário pular restantes 2:
-	 * Processar uma imagem com no mínimo x bytes e no máximo 
-	 * com 5000 KB, caso contrário pulá-la 3: Receber no mínimo quatro
+	 * Regras de negócio: 1: Processar ao menos uma string (>1 byte) do arquivo com
+	 * frases de legenda e no máximo 32 KB do arquivo, caso contrário pular
+	 * restantes 2: Processar uma imagem com no mínimo 8 bytes (nenhum arquivo PNG
+	 * com menos bytes do que sua assinatura mágica pode ser uma imagem válida) e no
+	 * máximo com 5000 KB, caso contrário pulá-la 3: Receber no mínimo quatro
 	 * argumentos conhecidos e no máximo seis argumentos conhecidos
 	 */
 
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
 			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help";
-	private static final int COMPRIM_MIN_VETSTR = 1, TAM_MAX_KB_ARQ_STR = Integer.SIZE, COMPRIM_MIN_VETIMG = 1,
-			COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 6;
-	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000);
+	private static final int COMPRIM_MIN_VETSTR = 1, COMPRIM_MIN_VETIMG = 1, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 6;
+	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000),
+			TAM_MIN_KB_ARQ_IMG = new BigDecimal("0.008"), TAM_MAX_KB_ARQ_STR = new BigDecimal(Integer.SIZE),
+			TAM_MIN_KB_ARQ_STR = new BigDecimal("0.002"), FATR_B_CONVERSAO = new BigDecimal(1000);
 
 	public static void main(String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
@@ -172,30 +174,26 @@ public class Main {
 		Scanner escaneadr = new Scanner(System.in);
 		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real);
 		if (razaoerro != null) {
-			System.out.printf("Erro: %s\n", razaoerro);
+			System.out.printf("[ERRO FATAL] %s\n", razaoerro);
 			return;
 		}
 		OperacaoComMeme conjartefato = manipularComposicaoArg(args, comprim_real);
-		/*
-		 * System.out.
-		 * printf("Acesso intermediado:\n Total de imagens: %d,\nLegendas: %s,\nLado da edição: %s\n"
-		 * , conjartefato.getConjimg().length,
-		 * Arrays.toString(conjartefato.getConjlegend()),
-		 * conjartefato.getLadoedicaovert());
-		 */
-		int selecaoescolhamenu;
+		short selecaoescolhamenu = 0;
 		AttributedString txtcomatr = new AttributedString(new String("-"));
-		do {
+		if (conjartefato == null)
+			return;
+		while (selecaoescolhamenu != -1) {
 			selecaoescolhamenu = encaminharOpcaoMenu(escaneadr, conjartefato, txtcomatr);
-		} while (selecaoescolhamenu != -1);
+		}
 		escaneadr.close();
 	}
 
-	private static int encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato, AttributedString txtcomatr)
+	private static short encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato,
+			AttributedString txtcomatr)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
-		int selecaomenu = escaneadr.nextInt();
+		short selecaomenu = escaneadr.nextShort();
 		selecaomenu--;
 		OpcaoValidaMenu[] conjopc = OpcaoValidaMenu.values();
 		OpcaoValidaMenu opcao = (selecaomenu >= 0 && selecaomenu < (conjopc.length - 1)) ? conjopc[selecaomenu]
@@ -244,6 +242,7 @@ public class Main {
 				txtcomatr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
 		}
 		case ENCERRARPROG -> {
+			System.out.printf("Encerramento solicitado.");
 			return -1;
 		}
 		default -> {
@@ -271,43 +270,62 @@ public class Main {
 		String ladoedicaovert = new String();
 		OperacaoComMeme conjartefretornado = Arrays.asList(lsarg).contains(REVIEW_MODE_FLAG) ? new OperacaoComMeme(true)
 				: new OperacaoComMeme(false);
-		File[] lsarq = new File[0];
-		int[] indrm = new int[0];
-		BigDecimal[][] lsprop = new BigDecimal[conjimg.length][2];
+		File[] lsarq = new File[0], lsarqutil = new File[0];
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
-				if (lsarg[(i - 1)].equals(IMG_DIR_FLAG) && new File(lsarg[i]).isDirectory()) {
-					File dirimg = new File(lsarg[i]);
-					lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
-					conjimg = validarImgEmDir(dirimg, lsarq);
-					System.out.printf("O PROGRAMA FOI CARREGADO COM OS SEGUINTES ARQUIVOS E SUAS PROPRIEDADES:\n");
-					for (int j = 0; j < conjimg.length; j++) {
-						lsprop[j][0] = new BigDecimal(lsarq[j].length()).divide(new BigDecimal(1024 * 1024));
-						if (lsprop[j][0].compareTo(TAM_MAX_KB_ARQ_IMG) == 1) {
+				if (lsarg[(i - 1)].equals(IMG_DIR_FLAG)) {
+					boolean temdir = new File(lsarg[i]).isDirectory();
+					if (temdir) {
+						File dirimg = new File(lsarg[i]);
+						boolean temimgemdir = aferirItemFilho(dirimg);
+						if (!temimgemdir) {
 							System.out.printf(
-									"O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s). Ele não será sorteado como base de meme.\n",
-									lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
-							indrm = indrm.length == 0 ? new int[1] : Arrays.copyOf(indrm, (indrm.length + 1));
+									"[ERRO FATAL] Não existe nenhum arquivo na pasta informada. É necessário pelo menos um arquivo que seja uma imagem.");
+							break;
 						}
+						lsarq = dirimg.listFiles((dir, name) -> !name.equals("out"));
+						BigDecimal[][] lsprop = new BigDecimal[lsarq.length][2];
+						for (int j = 0; j < lsarq.length; j++) {
+							lsprop[j][0] = new BigDecimal(lsarq[j].length()).divide(new BigDecimal(1000));
+							if (lsprop[j][0].compareTo(TAM_MAX_KB_ARQ_IMG) == 1) {
+								System.out.printf(
+										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n",
+										lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
+								continue;
+							} else if (lsprop[j][0].compareTo(TAM_MIN_KB_ARQ_IMG) == -1) {
+								System.out.printf(
+										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n",
+										lsarq[j].getAbsolutePath(), TAM_MIN_KB_ARQ_IMG.toPlainString());
+								continue;
+							} else
+								lsarqutil = lsarqutil.length == 0 ? new File[1]
+										: Arrays.copyOf(lsarqutil, (lsarqutil.length + 1));
+							lsarqutil[(lsarqutil.length - 1)] = lsarq[j];
+						}
+						System.out.printf("\n");
+						conjimg = validarImgEmDir(dirimg, lsarqutil);
+						for (short j = 0; j < conjimg.length; j++) {
+							System.out.printf("%s carregado com sucesso.\n", lsarqutil[j].getAbsolutePath());
+						}
+						if (conjimg.length > 0)
+							argtemdirimg = true;
+						else {
+							System.out.printf("[ERRO FATAL] Diretório não contém imagens.");
+							break;
+						}
+						conjartefretornado.setDirescrita(lsarg[i]);
+					} else {
+						System.out.printf("[ERRO FATAL] Pasta informada não existe.");
+						break;
 					}
-					int k = 0;
-					List<File> lsauxarq = Arrays.asList(lsarq);
-					List<BufferedImage> lsauximg = Arrays.asList(conjimg);
-					for (int j = 0; j < indrm.length; j++) {
-						lsauxarq.remove(indrm[j] - k);
-						lsauximg.remove(indrm[j] - k);
-						k++;
-					}
-					lsarq = File[].class.cast(lsauxarq.toArray());
-					conjimg = BufferedImage[].class.cast(lsauximg.toArray());
-					argtemdirimg = true;
-					conjartefretornado.setDirescrita(lsarg[i]);
 				}
 			}
 
 			if (!argtemarqfrase) {
 				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG) && new File(lsarg[i]).isFile()) {
 					conjlegend = validarArqFrase(lsarg[i]);
+					if (conjlegend[0].equals("ERR"))
+						break;
 					System.out.printf("Strings de frases: %s.\n\n", Arrays.toString(conjlegend));
 					argtemarqfrase = true;
 				}
@@ -322,7 +340,7 @@ public class Main {
 				}
 			}
 			if (argtemdirimg && argtemarqfrase) {
-				conjartefretornado.setLsarq(lsarq);
+				conjartefretornado.setLsarq(lsarqutil);
 				conjartefretornado.setConjimg(conjimg);
 				conjartefretornado.setConjlegend(conjlegend);
 
@@ -338,6 +356,10 @@ public class Main {
 		else
 			conjartefretornado = null;
 		return conjartefretornado;
+	}
+
+	private static boolean aferirItemFilho(File dirimg) {
+		return dirimg.listFiles().length > COMPRIM_MIN_VETIMG;
 	}
 
 	private static BufferedImage[] validarImgEmDir(File dirimg, File[] lsarq) throws IOException {
@@ -356,14 +378,34 @@ public class Main {
 	}
 
 	private static String[] validarArqFrase(String caminhoarq) throws IOException {
-		final String DELIMIT_FRASE = ";";
 		File arqlegend = new File(caminhoarq);
+		String[] conjlegend = null;
+		boolean temcorte = false;
+		if (new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO).compareTo(TAM_MIN_KB_ARQ_STR) == -1) {
+			System.out.printf("[ERRO FATAL] O arquivo com legendas para o meme praticamente não possui texto.\n");
+			return new String[] { "ERR" };
+		} else if (new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO).compareTo(TAM_MAX_KB_ARQ_STR) == 1) {
+			System.out.printf(
+					"[AVISO] arquivo com legendas para o meme possui um tamanho superior ao permitido. Ele será reduzido ao maior tamanho compatível por meio da exclusão das últimas frases.\n");
+			temcorte = true;
+		}
+		final String DELIMIT_FRASE = ";";
 		FileReader leitorarq = new FileReader(arqlegend);
 		BufferedReader leitorsegmnt = new BufferedReader(leitorarq);
-		String linhautil;
-		String[] conjlegend = null;
-		while ((linhautil = leitorsegmnt.readLine()) != null) {
-			conjlegend = linhautil.split(DELIMIT_FRASE);
+		if (temcorte) {
+			char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue() * 1000)];
+			int leiturab = leitorsegmnt.read(bufferLimitd, 0, bufferLimitd.length);
+			String legendtrunc = new String(bufferLimitd, 0, leiturab);
+			int ultimaDelimit = legendtrunc.lastIndexOf(DELIMIT_FRASE);
+			if (ultimaDelimit != -1) {
+				legendtrunc = legendtrunc.substring(0, ultimaDelimit);
+			}
+			conjlegend = legendtrunc.split(DELIMIT_FRASE);
+		} else {
+			String linhautil;
+			while ((linhautil = leitorsegmnt.readLine()) != null) {
+				conjlegend = linhautil.split(DELIMIT_FRASE);
+			}
 		}
 		leitorarq.close();
 		return conjlegend;
@@ -425,10 +467,11 @@ public class Main {
 
 	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita,
 			AttributedString atrtxt) throws NullPointerException {
+		final short TAM_FNT_PADRAO = 100;
 		Object atrfamfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FAMILY) : (Object) "Arial",
 				atrcorfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FOREGROUND) : Color.BLACK;
-		Font fntsis = atrfamfnt != null ? new Font(atrfamfnt.toString(), Font.BOLD, 100)
-				: new Font("Arial", Font.BOLD, 100);
+		Font fntsis = atrfamfnt != null ? new Font(atrfamfnt.toString(), Font.BOLD, TAM_FNT_PADRAO)
+				: new Font("Arial", Font.BOLD, TAM_FNT_PADRAO);
 		if (atrcorfnt == null)
 			atrtxt.addAttribute(TextAttribute.FOREGROUND, Color.BLACK);
 		Graphics grafimg = imgaleat.getGraphics();
@@ -470,10 +513,12 @@ public class Main {
 
 	private static double manipularTamFnt(FontMetrics inspetorfnt, GlyphVector vetglifo, Shape contorno,
 			BufferedImage imgamostra, Font fntsis) {
+		final double proporcaomarg = 1.05;
 		double largtxtnormal = contorno.getBounds().getWidth(), alturatxtnormal = contorno.getBounds().getHeight();
 		int largimg = imgamostra.getWidth();
 		int alturaimg = imgamostra.getHeight();
-		boolean margemconfortavel = largimg > largtxtnormal * 1.05 && alturaimg > alturatxtnormal * 1.05;
+		boolean margemconfortavel = largimg > largtxtnormal * proporcaomarg
+				&& alturaimg > alturatxtnormal * proporcaomarg;
 		if (margemconfortavel)
 			return 0;
 		else {
