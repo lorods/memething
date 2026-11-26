@@ -153,7 +153,7 @@ public class Main {
 
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
 			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help";
-	private static final int COMPRIM_MIN_VETSTR = 1, COMPRIM_MIN_VETIMG = 1, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 6;
+	private static final int COMPRIM_MIN_VETSTR = 1, COMPRIM_MIN_VETIMG = 1, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 7;
 	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000),
 			TAM_MIN_KB_ARQ_IMG = new BigDecimal("0.008"), TAM_MAX_KB_ARQ_STR = new BigDecimal(Integer.SIZE),
 			TAM_MIN_KB_ARQ_STR = new BigDecimal("0.002"), FATR_B_CONVERSAO = new BigDecimal(1000);
@@ -268,8 +268,24 @@ public class Main {
 		BufferedImage[] conjimg = new BufferedImage[0];
 		String[] conjlegend = new String[0];
 		String ladoedicaovert = new String();
-		OperacaoComMeme conjartefretornado = Arrays.asList(lsarg).contains(REVIEW_MODE_FLAG) ? new OperacaoComMeme(true)
-				: new OperacaoComMeme(false);
+		OperacaoComMeme conjartefretornado;
+		if (Arrays.asList(lsarg).contains(REVIEW_MODE_FLAG)) {
+			String[] lsargaux = new String[0];
+			int controladrpos = -1;
+			for (int i = 0; i < lsarg.length; i++) {
+				if (lsarg[i].equals(REVIEW_MODE_FLAG)) {
+					continue;
+				} else {
+					lsargaux = controladrpos == -1 ? lsargaux = new String[1]
+							: Arrays.copyOf(lsargaux, (lsargaux.length + 1));
+					controladrpos++;
+					lsargaux[controladrpos] = lsarg[i];
+				}
+			}
+			conjartefretornado = new OperacaoComMeme(true);
+		} else {
+			conjartefretornado = new OperacaoComMeme(false);
+		}
 		File[] lsarq = new File[0], lsarqutil = new File[0];
 		for (int i = 1; i <= comprim_real; i += 2) {
 			if (!argtemdirimg) {
@@ -324,9 +340,9 @@ public class Main {
 			if (!argtemarqfrase) {
 				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG) && new File(lsarg[i]).isFile()) {
 					conjlegend = validarArqFrase(lsarg[i]);
-					if (conjlegend[0].equals("ERR"))
+					if (conjlegend == null || conjlegend[0].equals("ERR"))
 						break;
-					System.out.printf("Strings de frases: %s.\n\n", Arrays.toString(conjlegend));
+					System.out.printf("Strings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
 					argtemarqfrase = true;
 				}
 			}
@@ -386,12 +402,13 @@ public class Main {
 			return new String[] { "ERR" };
 		} else if (new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO).compareTo(TAM_MAX_KB_ARQ_STR) == 1) {
 			System.out.printf(
-					"[AVISO] arquivo com legendas para o meme possui um tamanho superior ao permitido. Ele será reduzido ao maior tamanho compatível por meio da exclusão das últimas frases.\n");
+					"[AVISO] O arquivo com legendas para o meme possui um tamanho superior ao permitido. Ele será reduzido ao maior tamanho compatível por meio da exclusão das últimas frases.\n");
 			temcorte = true;
 		}
 		final String DELIMIT_FRASE = ";";
 		FileReader leitorarq = new FileReader(arqlegend);
 		BufferedReader leitorsegmnt = new BufferedReader(leitorarq);
+		int ctdrocorrencia = 0, ind = 0;
 		if (temcorte) {
 			char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue() * 1000)];
 			int leiturab = leitorsegmnt.read(bufferLimitd, 0, bufferLimitd.length);
@@ -400,12 +417,32 @@ public class Main {
 			if (ultimaDelimit != -1) {
 				legendtrunc = legendtrunc.substring(0, ultimaDelimit);
 			}
+			while ((ind = legendtrunc.lastIndexOf(DELIMIT_FRASE, ind)) != -1) {
+				ctdrocorrencia++;
+				ind += DELIMIT_FRASE.length();
+			}
+			if (ctdrocorrencia < COMPRIM_MIN_VETSTR) {
+				System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.");
+				leitorarq.close();
+				return null;
+			}
 			conjlegend = legendtrunc.split(DELIMIT_FRASE);
 		} else {
-			String linhautil;
-			while ((linhautil = leitorsegmnt.readLine()) != null) {
-				conjlegend = linhautil.split(DELIMIT_FRASE);
+			String linhautil = new String(), linhasincroniz = null;
+			while (linhautil != null) {
+				linhasincroniz = linhasincroniz == null ? new String() : linhasincroniz.concat(linhautil);
+				linhautil = leitorsegmnt.readLine();
 			}
+			while ((ind = linhasincroniz.lastIndexOf(DELIMIT_FRASE, ind)) != -1) {
+				ctdrocorrencia++;
+				ind += DELIMIT_FRASE.length();
+			}
+			if (ctdrocorrencia < COMPRIM_MIN_VETSTR) {
+				System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.");
+				leitorarq.close();
+				return null;
+			}
+			conjlegend = linhasincroniz.split(DELIMIT_FRASE);
 		}
 		leitorarq.close();
 		return conjlegend;
@@ -531,5 +568,17 @@ public class Main {
 	private static int calcPosicHorizonLegend(int largimg, int largtxt) {
 		return new BigDecimal(largimg).subtract(new BigDecimal(largtxt)).divide(BigDecimal.TWO, RoundingMode.HALF_UP)
 				.intValue();
+	}
+
+	private static String resgatarStringDeArrComPontuacao(String[] conjlegend) {
+		if (conjlegend == null || (conjlegend.length - 1) == -1)
+			return "NENHUMA";
+		int iMax = conjlegend.length;
+		StringBuilder constrstr = new StringBuilder();
+		for (int i = 0; i < iMax; i++) {
+			constrstr.append(String.valueOf(conjlegend[i]));
+			constrstr.append(i == (iMax - 1) ? "." : ", ");
+		}
+		return constrstr.toString();
 	}
 }
