@@ -172,7 +172,8 @@ public class Main {
 			return;
 		}
 		Scanner escaneadr = new Scanner(System.in);
-		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real);
+		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real,
+				Arrays.asList(args).contains(REVIEW_MODE_FLAG));
 		if (razaoerro != null) {
 			System.out.printf("[ERRO FATAL] %s\n", razaoerro);
 			return;
@@ -253,12 +254,15 @@ public class Main {
 		return selecaomenu;
 	}
 
-	private static String aferirIntervaloComprimento(int comprim_min, int comprim_max, int comprim_real) {
+	private static String aferirIntervaloComprimento(int comprim_min, int comprim_max, int comprim_real,
+			boolean temrevisao) {
+		boolean comprimincompleto = temrevisao ? (comprim_real == 4 || comprim_real == 6)
+				: (comprim_real == 5 || comprim_real == 7);
 		String razaoretornocomp = comprim_real < comprim_min
 				? "lista de argumentos insuficiente (mínimo são ".concat(String.valueOf(comprim_min)).concat(").")
 				: (comprim_real > comprim_max
 						? "lista de argumentos excessiva (máximo são ".concat(String.valueOf(comprim_max)).concat(").")
-						: (comprim_real == 5 ? "lista de argumentos está incompleta; argumentos esperados: 4 ou 6."
+						: (comprimincompleto ? "lista de argumentos está incompleta; argumentos esperados: 4 ou 6."
 								: null));
 		return razaoretornocomp;
 	}
@@ -282,6 +286,8 @@ public class Main {
 					lsargaux[controladrpos] = lsarg[i];
 				}
 			}
+			lsarg = lsargaux;
+			comprim_real = lsarg.length;
 			conjartefretornado = new OperacaoComMeme(true);
 		} else {
 			conjartefretornado = new OperacaoComMeme(false);
@@ -338,12 +344,17 @@ public class Main {
 			}
 
 			if (!argtemarqfrase) {
-				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG) && new File(lsarg[i]).isFile()) {
-					conjlegend = validarArqFrase(lsarg[i]);
-					if (conjlegend == null || conjlegend[0].equals("ERR"))
+				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG)) {
+					if (new File(lsarg[i]).isFile()) {
+						conjlegend = validarArqFrase(lsarg[i]);
+						if (conjlegend == null || conjlegend[0].equals("ERR"))
+							break;
+						System.out.printf("Strings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
+						argtemarqfrase = true;
+					} else {
+						System.out.printf("[ERRO FATAL] Arquivo de frases informado não existe.");
 						break;
-					System.out.printf("Strings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
-					argtemarqfrase = true;
+					}
 				}
 			}
 
@@ -417,7 +428,7 @@ public class Main {
 			if (ultimaDelimit != -1) {
 				legendtrunc = legendtrunc.substring(0, ultimaDelimit);
 			}
-			while ((ind = legendtrunc.lastIndexOf(DELIMIT_FRASE, ind)) != -1) {
+			while ((ind = legendtrunc.indexOf(DELIMIT_FRASE, ind)) != -1) {
 				ctdrocorrencia++;
 				ind += DELIMIT_FRASE.length();
 			}
@@ -433,7 +444,7 @@ public class Main {
 				linhasincroniz = linhasincroniz == null ? new String() : linhasincroniz.concat(linhautil);
 				linhautil = leitorsegmnt.readLine();
 			}
-			while ((ind = linhasincroniz.lastIndexOf(DELIMIT_FRASE, ind)) != -1) {
+			while ((ind = linhasincroniz.indexOf(DELIMIT_FRASE, ind)) != -1) {
 				ctdrocorrencia++;
 				ind += DELIMIT_FRASE.length();
 			}
@@ -451,6 +462,7 @@ public class Main {
 	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg, File[] lsarq, boolean revisaoativ,
 			Scanner escaneadr) {
 		int aleatsegur;
+		escaneadr.nextLine();
 		for (;;) {
 			aleatsegur = obterIntAleatSegur(conjamostraimg.length);
 			if (revisaoativ) {
