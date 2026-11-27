@@ -4,7 +4,9 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
 
@@ -20,6 +22,7 @@ import java.awt.Shape;
 import java.awt.font.GlyphVector;
 import java.awt.font.TextAttribute;
 import java.io.File;
+import java.io.FileInputStream;
 import java.security.SecureRandom;
 import java.text.AttributedCharacterIterator.Attribute;
 import java.text.AttributedString;
@@ -149,7 +152,8 @@ public class Main {
 	 * restantes 2: Processar uma imagem com no mínimo 8 bytes (nenhum arquivo PNG
 	 * com menos bytes do que sua assinatura mágica pode ser uma imagem válida) e no
 	 * máximo com 5000 KB, caso contrário pulá-la 3: Receber no mínimo quatro
-	 * argumentos conhecidos e no máximo sete argumentos conhecidos
+	 * argumentos conhecidos e no máximo sete argumentos conhecidos; ignorar
+	 * argumentos desconhecidos
 	 */
 
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
@@ -178,7 +182,8 @@ public class Main {
 					"===Ajuda do programa===\nAbaixo, colchetes denotam um parâmetro facultativo:\n\n--imgdir <caminho>\tpasta que contém as imagens de amostra, uma sorteada por meme\n--captionls <caminho>\tarquivo com strings para a legenda separadas por ponto e vírgula\n[--edge <top|bottom>]\to lado vertical próximo do qual a legenda deve ser inserida\n[--reviewtime]\tperguntar se o valor sorteado deve ser descartado ou usado\n[--help]\texibir esta mensagem de ajuda e encerrar");
 			return;
 		}
-		Scanner escaneadr = new Scanner(System.in);
+		Scanner escaneadr = (System.console() != null) ? new Scanner(System.in, System.console().charset())
+				: new Scanner(System.in);
 		String razaoErro = aferirIntervaloComprimento(comprimMinArg, comprimMaxArg, comprimReal,
 				Arrays.asList(args).contains(REVIEW_MODE_FLAG));
 		if (razaoErro != null) {
@@ -196,49 +201,51 @@ public class Main {
 		escaneadr.close();
 	}
 
-	static byte encaminharOpcaoMenu(Scanner escaneadr, AttributedString txtcomatr)
-			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+	static byte encaminharOpcaoMenu(Scanner escaneadr, AttributedString txtComAtr)
+			throws IOException, IllegalAccessException {
 		System.out.printf(
-				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
-		byte selecaomenu = 0;
+				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais (será salvo em <pasta de seu usuário>/.memething/editado)\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
+		byte selecaoMenu = 0;
 		while (!escaneadr.hasNextByte()) {
-			System.out.printf("Entrada inválida! Digite um número inteiro correspondente à opção (1–4): ");
-			escaneadr.next(); // descarta a palavra/letra inválida do buffer para não entrar em loop infinito
+			if (!escaneadr.hasNextLine()) {
+				return -1; // evita erro caso a entrada seja encerrada (Ctrl+Z / Ctrl+D)
+			}
+			System.out.printf("Opção inválida! Digite um número inteiro de 1 a 4 correspondente à devida opção: ");
+			escaneadr.nextLine();
 		}
-		selecaomenu = escaneadr.nextByte();
-		escaneadr.nextLine(); // consome a quebra de linha (\n) após o número
-		selecaomenu--;
-		OpcaoValidaMenu[] conjopc = OpcaoValidaMenu.values();
-		OpcaoValidaMenu opcao = (selecaomenu >= 0 && selecaomenu < (conjopc.length - 1)) ? conjopc[selecaomenu]
+		selecaoMenu = escaneadr.nextByte();
+		escaneadr.nextLine();
+		selecaoMenu--;
+		OpcaoValidaMenu[] conjOpc = OpcaoValidaMenu.values();
+		OpcaoValidaMenu opcao = (selecaoMenu >= 0 && selecaoMenu < (conjOpc.length - 1)) ? conjOpc[selecaoMenu]
 				: OpcaoValidaMenu.INVALIDA;
 		switch (opcao) {
 		case CRIAR_MEME -> {
-			if (conjArtefato != null) {
-				Map<Attribute, Object> conjatr = txtcomatr.getIterator().getAttributes();
-				Object familiafntusuario = conjatr.get(TextAttribute.FAMILY),
-						corfntusuario = conjatr.get(AtrPersonalizado.COR_FNT);
-				System.out.printf(
-						"===CONFIGURAÇÕES ATUAIS===\nFonte tipográfica: %s\nCor da fonte da legenda (em inglês): %s.\n",
-						familiafntusuario != null ? familiafntusuario.toString()
-								: "padrão do programa (".concat(FNT_PADRAO).concat(")"),
-						corfntusuario != null ? corfntusuario.toString()
-								: "padrão do programa (".concat(COR_FNT_PADRAO).concat(")"));
-				BufferedImage imgaleat = obterImgAleatoria(conjArtefato.getConjimg(), conjArtefato.getLsarq(),
-						conjArtefato.temRevisaoativ(), escaneadr);
-				String frasesel = obterFraseAleatoria(conjArtefato.getConjlegend(), conjArtefato.temRevisaoativ(),
-						escaneadr);
-				txtcomatr = new AttributedString(frasesel);
-				txtcomatr.addAttributes(conjatr, 0, frasesel.length());
-				Graphics ctxgrafimg = desenharStringEmImg(imgaleat, frasesel, conjArtefato.getLadoedicaovert(),
-						!txtcomatr.getIterator().getAllAttributeKeys().isEmpty() ? txtcomatr : null);
-				String seloatualdatahr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
-						.format(Instant.now());
-				String direscrita = conjArtefato.getDirescrita();
-				File arqpescrita = new File(direscrita, "../../editado/meme_".concat(seloatualdatahr).concat(".png"));
-				manipularArqSaida(arqpescrita);
-				gravarImgEmArq(imgaleat, arqpescrita);
-				ctxgrafimg.dispose();
-			}
+			Map<Attribute, Object> conjatr = txtComAtr.getIterator().getAttributes();
+			Object familiafntusuario = conjatr.get(TextAttribute.FAMILY),
+					corfntusuario = conjatr.get(AtrPersonalizado.COR_FNT);
+			System.out.printf(
+					"===CONFIGURAÇÕES ATUAIS===\nFonte tipográfica: %s\nCor da fonte da legenda (em inglês): %s.\n",
+					familiafntusuario != null ? familiafntusuario.toString()
+							: "padrão do programa (".concat(FNT_PADRAO).concat(")"),
+					corfntusuario != null ? corfntusuario.toString()
+							: "padrão do programa (".concat(COR_FNT_PADRAO).concat(")"));
+			BufferedImage imgaleat = obterImgAleatoria(conjArtefato.getConjimg(), conjArtefato.getLsarq(),
+					conjArtefato.temRevisaoativ(), escaneadr);
+			String frasesel = obterFraseAleatoria(conjArtefato.getConjlegend(), conjArtefato.temRevisaoativ(),
+					escaneadr);
+			txtComAtr = new AttributedString(frasesel);
+			txtComAtr.addAttributes(conjatr, 0, frasesel.length());
+			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, frasesel, conjArtefato.getLadoedicaovert(),
+					!txtComAtr.getIterator().getAllAttributeKeys().isEmpty() ? txtComAtr : null);
+			String seloAtualDtHr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
+					.format(Instant.now());
+			String prefixDirEscrita = System.getProperty("user.home");
+			File arqParaEscrita = new File(prefixDirEscrita,
+					"memething/editado/meme_".concat(seloAtualDtHr).concat(".png"));
+			manipularArqSaida(arqParaEscrita);
+			gravarImgEmArq(imgaleat, arqParaEscrita);
+			ctxgrafimg.dispose();
 		}
 		case DEFINIR_FNT_NA_MEM -> {
 			System.out
@@ -248,7 +255,7 @@ public class Main {
 			if (!fntdisponivel) {
 				System.out.printf("A fonte que você informou não pôde ser carregada de seu sistema.\n");
 			} else
-				txtcomatr.addAttribute(TextAttribute.FAMILY, nomefamiliafnt);
+				txtComAtr.addAttribute(TextAttribute.FAMILY, nomefamiliafnt);
 		}
 		case DEFINIR_COR_FNT_NA_MEM -> {
 			System.out.printf(
@@ -259,8 +266,8 @@ public class Main {
 				System.out.printf(
 						"A cor que você informou não pôde ser localizada. Certifique-se de escrever a cor em inglês.\n");
 			else {
-				txtcomatr.addAttribute(AtrPersonalizado.COR_FNT, nomecorfnt);
-				txtcomatr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
+				txtComAtr.addAttribute(AtrPersonalizado.COR_FNT, nomecorfnt);
+				txtComAtr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
 			}
 		}
 		case ENCERRAR_PROG -> {
@@ -272,7 +279,7 @@ public class Main {
 			return -2;
 		}
 		}
-		return selecaomenu;
+		return selecaoMenu;
 	}
 
 	static String aferirIntervaloComprimento(int comprimMin, int comprimMax, int comprimReal, boolean temrevisao) {
@@ -328,12 +335,12 @@ public class Main {
 						BigDecimal[][] lsprop = new BigDecimal[0][0];
 						for (int j = 0; j < lsarq.length; j++) {
 							BigDecimal resultConvTam = converterValBParaKB(lsarq[j].length(), j);
-							if (aferirAceitacaoBigDec(resultConvTam, true) == 1) {
+							if (aferirAceitacaoBigDecParaImg(resultConvTam, true) == 1) {
 								System.out.printf(
 										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n\n",
 										lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
 								continue;
-							} else if (aferirAceitacaoBigDec(resultConvTam, false) == -1) {
+							} else if (aferirAceitacaoBigDecParaImg(resultConvTam, false) == -1) {
 								System.out.printf(
 										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n\n",
 										lsarq[j].getAbsolutePath(), TAM_MIN_KB_ARQ_IMG.toPlainString());
@@ -376,7 +383,6 @@ public class Main {
 							System.out.printf("[ERRO FATAL] Diretório não contém imagens.");
 							break;
 						}
-						conjArtefRetornado.setDirescrita(lsarg[i]);
 					} else {
 						System.out.printf("[ERRO FATAL] Pasta informada não existe.");
 						break;
@@ -388,7 +394,7 @@ public class Main {
 				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG)) {
 					if (new File(lsarg[i]).isFile()) {
 						conjlegend = validarArqFrase(lsarg[i]);
-						if (conjlegend == null || conjlegend[0].equals("ERR"))
+						if (conjlegend == null || conjlegend[0].equals(null))
 							break;
 						System.out.printf("\nStrings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
 						argtemarqfrase = true;
@@ -421,13 +427,17 @@ public class Main {
 		}
 		if (conjargestasuficiente)
 			conjArtefRetornado.setLadoedicaovert(LadoEditavelImg.TOPO.toString());
-		else
+		else {
+			System.out
+					.printf("[ERRO FATAL] Argumentos necessários ausentes; pelo menos um desconhecido foi informado.");
 			conjArtefRetornado = null;
+		}
 		return conjArtefRetornado;
 	}
 
-	static int aferirAceitacaoBigDec(BigDecimal resultConvTam, boolean primInvocIteracao) {
-		return primInvocIteracao ? resultConvTam.compareTo(TAM_MIN_KB_ARQ_IMG) : resultConvTam.compareTo(TAM_MAX_KB_ARQ_IMG);
+	static int aferirAceitacaoBigDecParaImg(BigDecimal resultConvTam, boolean primInvocIteracao) {
+		return primInvocIteracao ? resultConvTam.compareTo(TAM_MIN_KB_ARQ_IMG)
+				: resultConvTam.compareTo(TAM_MAX_KB_ARQ_IMG);
 	}
 
 	static BigDecimal converterValBParaKB(long compLsarq, int j) {
@@ -455,58 +465,68 @@ public class Main {
 		File arqlegend = new File(caminhoarq);
 		String[] conjlegend = null;
 		boolean temcorte = false;
-		if (new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO).compareTo(TAM_MIN_KB_ARQ_STR) == -1) {
+		if (aferirAceitacaoBigDecParaLeg(new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO), true) == -1) {
 			System.out.printf("[ERRO FATAL] O arquivo com legendas para o meme praticamente não possui texto.\n");
-			return new String[] { "ERR" };
-		} else if (new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO).compareTo(TAM_MAX_KB_ARQ_STR) == 1) {
+			return new String[] { null };
+		} else if (aferirAceitacaoBigDecParaLeg(new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO),
+				false) == 1) {
 			System.out.printf(
 					"[AVISO] O arquivo com legendas para o meme possui um tamanho superior ao permitido. Ele será reduzido ao maior tamanho compatível por meio da exclusão das últimas frases.\n");
 			temcorte = true;
 		}
 		FileReader leitorarq = new FileReader(arqlegend);
 		BufferedReader leitorsegmnt = new BufferedReader(leitorarq);
-		int ctdrocorrencia = 0, ind = 0;
-		if (temcorte) {
-			char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue() * FATR_B_CONVERSAO.intValue())];
-			int leiturab = leitorsegmnt.read(bufferLimitd, 0, bufferLimitd.length);
-			String legendtrunc = new String(bufferLimitd, 0, leiturab);
-			int ultimaDelimit = legendtrunc.lastIndexOf(DELIMIT_FRASE);
-			if (ultimaDelimit != -1) {
-				legendtrunc = legendtrunc.substring(0, ultimaDelimit);
-			}
-			while ((ind = legendtrunc.indexOf(DELIMIT_FRASE, ind)) != -1) {
-				ctdrocorrencia++;
-				ind += DELIMIT_FRASE.length();
-			}
-			if (ctdrocorrencia == COMPRIM_RECUSADO_VET_STR) {
-				System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.");
-				leitorarq.close();
-				return null;
-			}
-			conjlegend = legendtrunc.split(DELIMIT_FRASE);
-		} else {
-			String linhautil = new String(), linhasincroniz = null;
-			while (linhautil != null) {
-				linhasincroniz = linhasincroniz == null ? new String() : linhasincroniz.concat(linhautil);
-				linhautil = leitorsegmnt.readLine();
-			}
-			while ((ind = linhasincroniz.indexOf(DELIMIT_FRASE, ind)) != -1) {
-				ctdrocorrencia++;
-				ind += DELIMIT_FRASE.length();
-			}
-			if (ctdrocorrencia == COMPRIM_RECUSADO_VET_STR) {
-				System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.");
-				leitorarq.close();
-				return null;
-			}
-			conjlegend = linhasincroniz.split(DELIMIT_FRASE);
+		int limiteB = TAM_MAX_KB_ARQ_STR.intValue() * FATR_B_CONVERSAO.intValue();
+		byte[] leituraB;
+		try (FileInputStream streamEntrada = new FileInputStream(arqlegend)) {
+			leituraB = temcorte ? streamEntrada.readNBytes(limiteB) : streamEntrada.readAllBytes();
 		}
+		String texto = new String(leituraB, StandardCharsets.UTF_8).replace("\r", new String()).replace("\n",
+				new String());
+		int ultimaDelimit = texto.lastIndexOf(DELIMIT_FRASE);
+		if (ultimaDelimit == -1) {
+			System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.\n");
+			leitorsegmnt.close();
+			return null;
+		}
+		if (temcorte) {
+			texto = texto.substring(0, ultimaDelimit); // descarta a frase final cortada no limite de 32 KB
+		}
+		conjlegend = texto.split(DELIMIT_FRASE);
+		/*
+		 * if (temcorte) { char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue()
+		 * * FATR_B_CONVERSAO.intValue())]; int leiturab =
+		 * leitorsegmnt.read(bufferLimitd, 0, bufferLimitd.length); String legendtrunc =
+		 * new String(bufferLimitd, 0, leiturab); int ultimaDelimit =
+		 * legendtrunc.lastIndexOf(DELIMIT_FRASE); if (ultimaDelimit != -1) {
+		 * legendtrunc = legendtrunc.substring(0, ultimaDelimit); } while ((ind =
+		 * legendtrunc.indexOf(DELIMIT_FRASE, ind)) != -1) { ctdrocorrencia++; ind +=
+		 * DELIMIT_FRASE.length(); } if (ctdrocorrencia == COMPRIM_RECUSADO_VET_STR) {
+		 * System.out.
+		 * printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases."
+		 * ); leitorarq.close(); return null; } conjlegend =
+		 * legendtrunc.split(DELIMIT_FRASE); } else { String linhautil = new String(),
+		 * linhasincroniz = null; while (linhautil != null) { linhasincroniz =
+		 * linhasincroniz == null ? new String() : linhasincroniz.concat(linhautil);
+		 * linhautil = leitorsegmnt.readLine(); } while ((ind =
+		 * linhasincroniz.indexOf(DELIMIT_FRASE, ind)) != -1) { ctdrocorrencia++; ind +=
+		 * DELIMIT_FRASE.length(); } if (ctdrocorrencia == COMPRIM_RECUSADO_VET_STR) {
+		 * System.out.
+		 * printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases."
+		 * ); leitorarq.close(); return null; } conjlegend =
+		 * linhasincroniz.split(DELIMIT_FRASE); }
+		 */
 		if (conjlegend.length == COMPRIM_RECUSADO_VET_STR) {
 			leitorarq.close();
 			return null;
 		}
 		leitorarq.close();
 		return conjlegend;
+	}
+
+	private static int aferirAceitacaoBigDecParaLeg(BigDecimal resultConvTam, boolean primInvocIteracao) {
+		return primInvocIteracao ? resultConvTam.compareTo(TAM_MIN_KB_ARQ_STR)
+				: resultConvTam.compareTo(TAM_MAX_KB_ARQ_STR);
 	}
 
 	static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg, File[] lsarq, boolean revisaoativ,
@@ -519,7 +539,11 @@ public class Main {
 						.concat(lsarq[aleatsegur].getAbsolutePath())
 						.concat(". Você deseja continuar com ela? Digite \"não\" se não quiser, caso contrário \"sim\" ou qualquer outro valor: "));
 				String decisaorev = escaneadr.nextLine();
-				if (!decisaorev.toLowerCase().equals("não"))
+				decisaorev = decisaorev.toLowerCase(Locale.ROOT);
+				if (decisaorev.contains("\u0020")) {
+					decisaorev = decisaorev.trim();
+				}
+				if (!decisaorev.equals("não") && !decisaorev.equals("nao"))
 					break;
 			} else
 				break;
@@ -533,12 +557,12 @@ public class Main {
 		return imgcopia;
 	}
 
-	static String obterFraseAleatoria(String[] conjlegend, boolean revisaoativ, Scanner escaneadr) {
-		int aleatsegur;
+	static String obterFraseAleatoria(String[] conjlegend, boolean revisaoAtiv, Scanner escaneadr) {
+		int indAleatSegur;
 		for (;;) {
-			aleatsegur = obterIntAleatSegur(conjlegend.length);
-			if (revisaoativ) {
-				System.out.printf("A frase aleatória selecionada é ".concat(conjlegend[aleatsegur]).concat(
+			indAleatSegur = obterIntAleatSegur(conjlegend.length);
+			if (revisaoAtiv) {
+				System.out.printf("A frase aleatória selecionada é ".concat(conjlegend[indAleatSegur]).concat(
 						". Você deseja continuar com ela? Digite \"não\" se não quiser, caso contrário \"sim\" ou qualquer outro valor: "));
 				String decisaorev = escaneadr.nextLine();
 				if (!decisaorev.toLowerCase().equals("não"))
@@ -546,7 +570,7 @@ public class Main {
 			} else
 				break;
 		}
-		return conjlegend[aleatsegur];
+		return conjlegend[indAleatSegur];
 	}
 
 	static int obterIntAleatSegur(int comprim) {
@@ -558,58 +582,64 @@ public class Main {
 		return Arrays.asList(bibfnt).contains(nomefamiliafnt);
 	}
 
-	static Color procurarFntLocal(String nomecorfnt)
-			throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
+	static Color procurarFntLocal(String nomecorfnt) throws IllegalAccessException {
+		Color corFnt;
 		try {
-			return Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
+			corFnt = Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
 		} catch (NoSuchFieldException nsfe) {
-			return null;
+			corFnt = null;
 		}
+		return corFnt;
 	}
 
-	static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita,
-			AttributedString atrtxt) throws NullPointerException {
-		Object atrfamfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FAMILY)
+	static Graphics desenharStringEmImg(BufferedImage imgAleat, String frase, String ladoVertEscrita,
+			AttributedString atrTxt) {
+		Object atrfamfnt = atrTxt != null ? atrTxt.getIterator().getAttribute(TextAttribute.FAMILY)
 				: (Object) FNT_PADRAO,
-				atrcorfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FOREGROUND) : Color.BLACK;
-		Font fntsis = atrfamfnt != null ? new Font(atrfamfnt.toString(), Font.BOLD, TAM_FNT_PADRAO)
+				atrcorfnt = atrTxt != null ? atrTxt.getIterator().getAttribute(TextAttribute.FOREGROUND) : Color.BLACK;
+		Font fntSis = atrfamfnt != null ? new Font(atrfamfnt.toString(), Font.BOLD, TAM_FNT_PADRAO)
 				: new Font(FNT_PADRAO, Font.BOLD, TAM_FNT_PADRAO);
 		if (atrcorfnt == null)
-			atrtxt.addAttribute(TextAttribute.FOREGROUND, Color.BLACK);
-		Graphics grafimg = imgaleat.getGraphics();
-		FontMetrics inspetorfnt = grafimg.getFontMetrics(fntsis);
-		GlyphVector vetglifo = fntsis.createGlyphVector(inspetorfnt.getFontRenderContext(), frase);
-		float tamfntredimens = (float) manipularTamFnt(vetglifo.getOutline(0, 0), imgaleat, fntsis);
-		if (tamfntredimens != 0) {
-			fntsis = fntsis.deriveFont(fntsis.getStyle(), tamfntredimens);
-			inspetorfnt = grafimg.getFontMetrics(fntsis);
+			atrTxt.addAttribute(TextAttribute.FOREGROUND, Color.BLACK);
+		Graphics grafImg = imgAleat.getGraphics();
+		FontMetrics inspetorFnt = grafImg.getFontMetrics(fntSis);
+		GlyphVector vetGlifo = fntSis.createGlyphVector(inspetorFnt.getFontRenderContext(), frase);
+		float tamFntRedimens = (float) manipularTamFnt(vetGlifo.getOutline(0, 0), imgAleat, fntSis);
+		if (tamFntRedimens != 0) {
+			fntSis = fntSis.deriveFont(fntSis.getStyle(), tamFntRedimens);
+			inspetorFnt = grafImg.getFontMetrics(fntSis);
 		}
-		if (atrtxt != null)
-			atrtxt.addAttribute(TextAttribute.FONT, fntsis);
-		int[] postxt = new int[] { calcPosicHorizonLegend(imgaleat.getWidth(), inspetorfnt.stringWidth(frase)),
-				LadoEditavelImg.BAIXO.toString().equals(ladovertescrita)
-						? imgaleat.getHeight() - inspetorfnt.getAscent()
-						: inspetorfnt.getAscent() * 2 };
-		grafimg.setFont(fntsis);
-		grafimg.setColor(Color.BLACK);
-		if (atrtxt == null) {
-			grafimg.drawString(frase, postxt[0], postxt[1]);
+		if (atrTxt != null)
+			atrTxt.addAttribute(TextAttribute.FONT, fntSis);
+		int margVert = (int) (imgAleat.getHeight() * (FATOR_MARG - 1.0));
+		int[] posTxt = new int[] { calcPosicHorizonLegend(imgAleat.getWidth(), inspetorFnt.stringWidth(frase)),
+				LadoEditavelImg.BAIXO.toString().equals(ladoVertEscrita)
+						? Math.max(inspetorFnt.getAscent(), imgAleat.getHeight() - inspetorFnt.getDescent() - margVert)
+						: Math.min(margVert + inspetorFnt.getAscent(),
+								imgAleat.getHeight() - inspetorFnt.getDescent()) };
+		grafImg.setFont(fntSis);
+		grafImg.setColor(Color.BLACK);
+		if (atrTxt == null) {
+			grafImg.drawString(frase, posTxt[0], posTxt[1]);
 		} else {
-			grafimg.drawString(atrtxt.getIterator(), postxt[0], postxt[1]);
+			grafImg.drawString(atrTxt.getIterator(), posTxt[0], posTxt[1]);
 		}
-		return grafimg;
+		return grafImg;
 	}
 
-	private static void manipularArqSaida(File arqsaida) {
-		if (arqsaida.exists())
+	private static void manipularArqSaida(File arqSaida) {
+		if (arqSaida.exists())
 			return;
-		else
-			arqsaida.getParentFile().mkdirs();
+		else if (!arqSaida.getParentFile().mkdirs())
+			System.out.printf(
+					"O programa não conseguiu criar os diretórios necessários para armazenar os memes. Certifique-se de que o usuário com o qual você está logado tem permissão RW para eles.\n");
 	}
 
-	private static void gravarImgEmArq(BufferedImage imgmeme, File arqagravar) throws IOException {
-		ImageIO.write(imgmeme, "png", arqagravar);
-		System.out.printf("\nUm novo meme foi gravado com sucesso.\n");
+	private static void gravarImgEmArq(BufferedImage imgMeme, File arqAGravar) throws IOException {
+		System.out
+				.printf(ImageIO.write(imgMeme, "png", arqAGravar) != false ? "\nUm novo meme foi gravado com sucesso.\n"
+						: ("\nNão foi possível escrever a imagem no arquivo em "
+								.concat(arqAGravar.getAbsolutePath().concat(".\n"))));
 	}
 
 	static double manipularTamFnt(Shape contorno, BufferedImage imgamostra, Font fntsis) {
