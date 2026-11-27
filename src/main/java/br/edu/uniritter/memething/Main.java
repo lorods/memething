@@ -28,9 +28,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 
 public class Main {
-
 	enum OpcaoValidaMenu {
-		CRIARMEME, DEFINIRFNTNAMEM, DEFINIRCORFNTNAMEM, ENCERRARPROG, INVALIDA
+		CRIAR_MEME, DEFINIR_FNT_NA_MEM, DEFINIR_COR_FNT_NA_MEM, ENCERRAR_PROG, INVALIDA
 	}
 
 	protected static class OperacaoComMeme {
@@ -121,11 +120,8 @@ public class Main {
 	}
 
 	protected static class AtrPersonalizado extends Attribute {
-		/**
-		 * 
-		 */
 		private static final long serialVersionUID = 1L;
-		private static final AtrPersonalizado CORFNT = new AtrPersonalizado("corfonte");
+		private static final AtrPersonalizado COR_FNT = new AtrPersonalizado("corfonte");
 
 		protected AtrPersonalizado(String corfnt) {
 			super(corfnt);
@@ -153,13 +149,15 @@ public class Main {
 	 * restantes 2: Processar uma imagem com no mínimo 8 bytes (nenhum arquivo PNG
 	 * com menos bytes do que sua assinatura mágica pode ser uma imagem válida) e no
 	 * máximo com 5000 KB, caso contrário pulá-la 3: Receber no mínimo quatro
-	 * argumentos conhecidos e no máximo seis argumentos conhecidos
+	 * argumentos conhecidos e no máximo sete argumentos conhecidos
 	 */
 
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
-			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help";
-	private static final int COMPRIM_MIN_VETSTR = 1, COMPRIM_MIN_VETIMG = 1, COMPRIM_MIN_ARG = 4, COMPRIM_MAX_ARG = 7;
+			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help", DELIMIT_FRASE = ";", FNT_PADRAO = "Arial";
+	private static final int COMPRIM_RECUSADO_VET_STR = 0, COMPRIM_MIN_VET_IMG = 1, COMPRIM_MIN_ARG = 4,
+			COMPRIM_MAX_ARG = 7;
 	private static final double FATOR_MARG = 1.05;
+	private static final short TAM_FNT_PADRAO = 100;
 	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000),
 			TAM_MIN_KB_ARQ_IMG = new BigDecimal("0.008"), TAM_MAX_KB_ARQ_STR = new BigDecimal(Integer.SIZE),
 			TAM_MIN_KB_ARQ_STR = new BigDecimal("0.002"), FATR_B_CONVERSAO = new BigDecimal(1000);
@@ -167,11 +165,11 @@ public class Main {
 
 	public static void main(String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
-		final int COMPRIM_REAL = args.length;
-		execOperacionalizacao(COMPRIM_MIN_ARG, COMPRIM_MAX_ARG, COMPRIM_REAL, args);
+		final int comprimReal = args.length;
+		execOperacionalizacao(COMPRIM_MIN_ARG, COMPRIM_MAX_ARG, comprimReal, args);
 	}
 
-	private static void execOperacionalizacao(int comprim_min_arg, int comprim_max_arg, int comprim_real, String[] args)
+	private static void execOperacionalizacao(int comprimMinArg, int comprimMaxArg, int comprimReal, String[] args)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		if (Arrays.asList(args).contains(HELP_FLAG)) {
 			System.out.printf(
@@ -179,14 +177,14 @@ public class Main {
 			return;
 		}
 		Scanner escaneadr = new Scanner(System.in);
-		String razaoerro = aferirIntervaloComprimento(comprim_min_arg, comprim_max_arg, comprim_real,
+		String razaoerro = aferirIntervaloComprimento(comprimMinArg, comprimMaxArg, comprimReal,
 				Arrays.asList(args).contains(REVIEW_MODE_FLAG));
 		if (razaoerro != null) {
 			System.out.printf("[ERRO FATAL] %s\n", razaoerro);
 			return;
 		}
-		conjartefato = manipularComposicaoArg(args, comprim_real);
-		short selecaoescolhamenu = 0;
+		conjartefato = manipularComposicaoArg(args, comprimReal);
+		byte selecaoescolhamenu = 0;
 		AttributedString txtcomatr = new AttributedString(new String("-"));
 		if (conjartefato == null)
 			return;
@@ -196,7 +194,7 @@ public class Main {
 		escaneadr.close();
 	}
 
-	private static short encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato,
+	static byte encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato,
 			AttributedString txtcomatr)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
@@ -213,11 +211,11 @@ public class Main {
 		OpcaoValidaMenu opcao = (selecaomenu >= 0 && selecaomenu < (conjopc.length - 1)) ? conjopc[selecaomenu]
 				: OpcaoValidaMenu.INVALIDA;
 		switch (opcao) {
-		case CRIARMEME -> {
+		case CRIAR_MEME -> {
 			if (conjartefato != null) {
 				Map<Attribute, Object> conjatr = txtcomatr.getIterator().getAttributes();
 				Object familiafntusuario = conjatr.get(TextAttribute.FAMILY),
-						corfntusuario = conjatr.get(AtrPersonalizado.CORFNT);
+						corfntusuario = conjatr.get(AtrPersonalizado.COR_FNT);
 				System.out.printf(
 						"===CONFIGURAÇÕES ATUAIS===\nFonte tipográfica: %s\nCor da fonte da legenda (em inglês): %s.\n",
 						familiafntusuario != null ? familiafntusuario.toString() : "padrão do sistema",
@@ -239,7 +237,7 @@ public class Main {
 				ctxgrafimg.dispose();
 			}
 		}
-		case DEFINIRFNTNAMEM -> {
+		case DEFINIR_FNT_NA_MEM -> {
 			System.out
 					.printf("Insira ao lado o nome da fonte tipográfica para a legenda do meme (por exemplo, Arial): ");
 			String nomefamiliafnt = escaneadr.nextLine();
@@ -249,7 +247,7 @@ public class Main {
 			} else
 				txtcomatr.addAttribute(TextAttribute.FAMILY, nomefamiliafnt);
 		}
-		case DEFINIRCORFNTNAMEM -> {
+		case DEFINIR_COR_FNT_NA_MEM -> {
 			System.out.printf(
 					"Insira ao lado a cor EM INGLÊS da fonte tipográfica para a legenda do meme (por exemplo, \"red\"): ");
 			String nomecorfnt = escaneadr.nextLine();
@@ -258,11 +256,11 @@ public class Main {
 				System.out.printf(
 						"A cor que você informou não pôde ser localizada. Certifique-se de escrever a cor em inglês.\n");
 			else {
-				txtcomatr.addAttribute(AtrPersonalizado.CORFNT, nomecorfnt);
+				txtcomatr.addAttribute(AtrPersonalizado.COR_FNT, nomecorfnt);
 				txtcomatr.addAttribute(TextAttribute.FOREGROUND, cordisponivel);
 			}
 		}
-		case ENCERRARPROG -> {
+		case ENCERRAR_PROG -> {
 			System.out.printf("Encerramento solicitado.");
 			return -1;
 		}
@@ -274,20 +272,20 @@ public class Main {
 		return selecaomenu;
 	}
 
-	private static String aferirIntervaloComprimento(int comprim_min, int comprim_max, int comprim_real,
+	static String aferirIntervaloComprimento(int comprimMin, int comprimMax, int comprimReal,
 			boolean temrevisao) {
-		boolean comprimincompleto = temrevisao ? (comprim_real == 4 || comprim_real == 6)
-				: (comprim_real == 5 || comprim_real == 7);
-		String razaoretornocomp = comprim_real < comprim_min
-				? "lista de argumentos insuficiente (mínimo são ".concat(String.valueOf(comprim_min)).concat(").")
-				: (comprim_real > comprim_max
-						? "lista de argumentos excessiva (máximo são ".concat(String.valueOf(comprim_max)).concat(").")
-						: (comprimincompleto ? "lista de argumentos está incompleta; argumentos esperados: 4 ou 6."
+		boolean comprimincompleto = temrevisao ? (comprimReal == 4 || comprimReal == 6)
+				: (comprimReal == 5 || comprimReal == 7);
+		String razaoretornocomp = comprimReal < comprimMin
+				? "lista de argumentos insuficiente (mínimo são ".concat(String.valueOf(comprimMin)).concat(").")
+				: (comprimReal > comprimMax
+						? "lista de argumentos excessiva (máximo são ".concat(String.valueOf(comprimMax)).concat(").")
+						: (comprimincompleto ? "lista de argumentos está incompleta; argumentos esperados: de 4 a 7."
 								: null));
 		return razaoretornocomp;
 	}
 
-	private static OperacaoComMeme manipularComposicaoArg(String[] lsarg, int comprim_real) throws IOException {
+	private static OperacaoComMeme manipularComposicaoArg(String[] lsarg, int comprimReal) throws IOException {
 		boolean argtemarqfrase = false, argtemdirimg = false, ladoedicaoestadef = false, conjargestasuficiente = false;
 		BufferedImage[] conjimg = new BufferedImage[0];
 		String[] conjlegend = new String[0];
@@ -300,20 +298,19 @@ public class Main {
 				if (lsarg[i].equals(REVIEW_MODE_FLAG)) {
 					continue;
 				} else {
-					lsargaux = controladrpos == -1 ? lsargaux = new String[1]
-							: Arrays.copyOf(lsargaux, (lsargaux.length + 1));
+					lsargaux = controladrpos == -1 ? new String[1] : Arrays.copyOf(lsargaux, (lsargaux.length + 1));
 					controladrpos++;
 					lsargaux[controladrpos] = lsarg[i];
 				}
 			}
 			lsarg = lsargaux;
-			comprim_real = lsarg.length;
+			comprimReal = lsarg.length;
 			conjartefretornado = new OperacaoComMeme(true);
 		} else {
 			conjartefretornado = new OperacaoComMeme(false);
 		}
 		File[] lsarq = new File[0], lsarqutil = new File[0];
-		for (int i = 1; i <= comprim_real; i += 2) {
+		for (int i = 1; i < comprimReal; i += 2) {
 			if (!argtemdirimg) {
 				if (lsarg[(i - 1)].equals(IMG_DIR_FLAG)) {
 					boolean temdir = new File(lsarg[i]).isDirectory();
@@ -338,19 +335,20 @@ public class Main {
 										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n",
 										lsarq[j].getAbsolutePath(), TAM_MIN_KB_ARQ_IMG.toPlainString());
 								continue;
-							} else
-								lsarqutil = lsarqutil.length == 0 ? new File[1]
-										: Arrays.copyOf(lsarqutil, (lsarqutil.length + 1));
-							lsarqutil[(lsarqutil.length - 1)] = lsarq[j];
+							} else {
+								BufferedImage imgLida = ImageIO.read(lsarq[j]);
+								if (imgLida != null) {
+									conjimg = preencherOuConcatVet(conjimg, imgLida);
+
+									lsarqutil = preencherOuConcatVet(lsarq, lsarqutil, j);
+								}
+							}
 						}
 						System.out.printf("\n");
-						conjimg = validarImgEmDir(dirimg, lsarqutil);
-						if (lsarqutil.length != conjartefato.getLsarq().length)
-							lsarqutil = conjartefretornado.getLsarq();
 						for (short j = 0; j < conjimg.length; j++) {
 							System.out.printf("%s carregado com sucesso.\n", lsarqutil[j].getAbsolutePath());
 						}
-						if (conjimg.length > 0)
+						if (conjimg.length >= COMPRIM_MIN_VET_IMG)
 							argtemdirimg = true;
 						else {
 							System.out.printf("[ERRO FATAL] Diretório não contém imagens.");
@@ -406,30 +404,23 @@ public class Main {
 		return conjartefretornado;
 	}
 
-	private static File[] aferirItemFilho(File dirimg) {
+	static File[] aferirItemFilho(File dirimg) {
 		return dirimg.listFiles((dir, name) -> !name.equals("out"));
 	}
 
-	private static BufferedImage[] validarImgEmDir(File dirimg, File[] lsarq) throws IOException {
-		BufferedImage[] conjimg = new BufferedImage[0];
-		for (int i = 0; i < lsarq.length; i++) {
-			if (ImageIO.read(lsarq[i]) != null) {
-				if (conjimg.length == 0) {
-					conjimg = new BufferedImage[] { ImageIO.read(lsarq[i]) };
-				} else {
-					conjimg = Arrays.copyOf(conjimg, (conjimg.length + 1));
-					conjimg[(conjimg.length - 1)] = ImageIO.read(lsarq[i]);
-				}
-			} else {
-				lsarq = Arrays.copyOfRange(lsarq, 0, i);
-			}
-		}
-		if (conjimg.length != lsarq.length)
-			conjartefato.setLsarq(lsarq);
+	static BufferedImage[] preencherOuConcatVet(BufferedImage[] conjimg, BufferedImage imgLida) {
+		conjimg = conjimg.length == 0 ? new BufferedImage[1] : Arrays.copyOf(conjimg, (conjimg.length + 1));
+		conjimg[(conjimg.length - 1)] = imgLida;
 		return conjimg;
 	}
 
-	private static String[] validarArqFrase(String caminhoarq) throws IOException {
+	static File[] preencherOuConcatVet(File[] lsarq, File[] lsarqutil, int pos) {
+		lsarqutil = lsarqutil.length == 0 ? new File[1] : Arrays.copyOf(lsarqutil, (lsarqutil.length + 1));
+		lsarqutil[(lsarqutil.length - 1)] = lsarq[pos];
+		return lsarqutil;
+	}
+
+	static String[] validarArqFrase(String caminhoarq) throws IOException {
 		File arqlegend = new File(caminhoarq);
 		String[] conjlegend = null;
 		boolean temcorte = false;
@@ -441,7 +432,6 @@ public class Main {
 					"[AVISO] O arquivo com legendas para o meme possui um tamanho superior ao permitido. Ele será reduzido ao maior tamanho compatível por meio da exclusão das últimas frases.\n");
 			temcorte = true;
 		}
-		final String DELIMIT_FRASE = ";";
 		FileReader leitorarq = new FileReader(arqlegend);
 		BufferedReader leitorsegmnt = new BufferedReader(leitorarq);
 		int ctdrocorrencia = 0, ind = 0;
@@ -457,7 +447,7 @@ public class Main {
 				ctdrocorrencia++;
 				ind += DELIMIT_FRASE.length();
 			}
-			if (ctdrocorrencia < COMPRIM_MIN_VETSTR) {
+			if (ctdrocorrencia == COMPRIM_RECUSADO_VET_STR) {
 				System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.");
 				leitorarq.close();
 				return null;
@@ -473,18 +463,22 @@ public class Main {
 				ctdrocorrencia++;
 				ind += DELIMIT_FRASE.length();
 			}
-			if (ctdrocorrencia < COMPRIM_MIN_VETSTR) {
+			if (ctdrocorrencia == COMPRIM_RECUSADO_VET_STR) {
 				System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.");
 				leitorarq.close();
 				return null;
 			}
 			conjlegend = linhasincroniz.split(DELIMIT_FRASE);
 		}
+		if (conjlegend.length == COMPRIM_RECUSADO_VET_STR) {
+			leitorarq.close();
+			return null;
+		}
 		leitorarq.close();
 		return conjlegend;
 	}
 
-	private static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg, File[] lsarq, boolean revisaoativ,
+	static BufferedImage obterImgAleatoria(BufferedImage[] conjamostraimg, File[] lsarq, boolean revisaoativ,
 			Scanner escaneadr) {
 		int aleatsegur;
 		for (;;) {
@@ -508,7 +502,7 @@ public class Main {
 		return imgcopia;
 	}
 
-	private static String obterFraseAleatoria(String[] conjlegend, boolean revisaoativ, Scanner escaneadr) {
+	static String obterFraseAleatoria(String[] conjlegend, boolean revisaoativ, Scanner escaneadr) {
 		int aleatsegur;
 		for (;;) {
 			aleatsegur = obterIntAleatSegur(conjlegend.length);
@@ -524,16 +518,16 @@ public class Main {
 		return conjlegend[aleatsegur];
 	}
 
-	private static int obterIntAleatSegur(int comprim) {
+	static int obterIntAleatSegur(int comprim) {
 		return new SecureRandom().nextInt(comprim);
 	}
 
-	private static boolean aferirDisponibilidadeFnt(String nomefamiliafnt) {
+	static boolean aferirDisponibilidadeFnt(String nomefamiliafnt) {
 		String[] bibfnt = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
 		return Arrays.asList(bibfnt).contains(nomefamiliafnt);
 	}
 
-	private static Color procurarFntLocal(String nomecorfnt)
+	static Color procurarFntLocal(String nomecorfnt)
 			throws IllegalArgumentException, IllegalAccessException, NoSuchFieldException {
 		try {
 			return Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
@@ -542,20 +536,19 @@ public class Main {
 		}
 	}
 
-	private static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita,
+	static Graphics desenharStringEmImg(BufferedImage imgaleat, String frase, String ladovertescrita,
 			AttributedString atrtxt) throws NullPointerException {
-		final short TAM_FNT_PADRAO = 100;
-		Object atrfamfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FAMILY) : (Object) "Arial",
+		Object atrfamfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FAMILY)
+				: (Object) FNT_PADRAO,
 				atrcorfnt = atrtxt != null ? atrtxt.getIterator().getAttribute(TextAttribute.FOREGROUND) : Color.BLACK;
 		Font fntsis = atrfamfnt != null ? new Font(atrfamfnt.toString(), Font.BOLD, TAM_FNT_PADRAO)
-				: new Font("Arial", Font.BOLD, TAM_FNT_PADRAO);
+				: new Font(FNT_PADRAO, Font.BOLD, TAM_FNT_PADRAO);
 		if (atrcorfnt == null)
 			atrtxt.addAttribute(TextAttribute.FOREGROUND, Color.BLACK);
 		Graphics grafimg = imgaleat.getGraphics();
 		FontMetrics inspetorfnt = grafimg.getFontMetrics(fntsis);
 		GlyphVector vetglifo = fntsis.createGlyphVector(inspetorfnt.getFontRenderContext(), frase);
-		float tamfntredimens = (float) manipularTamFnt(inspetorfnt, vetglifo, vetglifo.getOutline(0, 0), imgaleat,
-				fntsis);
+		float tamfntredimens = (float) manipularTamFnt(vetglifo.getOutline(0, 0), imgaleat, fntsis);
 		if (tamfntredimens != 0) {
 			fntsis = fntsis.deriveFont(fntsis.getStyle(), tamfntredimens);
 			inspetorfnt = grafimg.getFontMetrics(fntsis);
@@ -588,8 +581,7 @@ public class Main {
 		System.out.printf("\nUm novo meme foi gravado com sucesso.\n");
 	}
 
-	private static double manipularTamFnt(FontMetrics inspetorfnt, GlyphVector vetglifo, Shape contorno,
-			BufferedImage imgamostra, Font fntsis) {
+	static double manipularTamFnt(Shape contorno, BufferedImage imgamostra, Font fntsis) {
 		double largtxtnormal = contorno.getBounds().getWidth(), alturatxtnormal = contorno.getBounds().getHeight();
 		int largimg = imgamostra.getWidth();
 		int alturaimg = imgamostra.getHeight();
@@ -603,12 +595,12 @@ public class Main {
 		}
 	}
 
-	private static int calcPosicHorizonLegend(int largimg, int largtxt) {
+	static int calcPosicHorizonLegend(int largimg, int largtxt) {
 		return new BigDecimal(largimg).subtract(new BigDecimal(largtxt)).divide(BigDecimal.TWO, RoundingMode.HALF_UP)
 				.intValue();
 	}
 
-	private static String resgatarStringDeArrComPontuacao(String[] conjlegend) {
+	static String resgatarStringDeArrComPontuacao(String[] conjlegend) {
 		if (conjlegend == null || (conjlegend.length - 1) == -1)
 			return "NENHUMA";
 		int iMax = conjlegend.length;
