@@ -153,7 +153,8 @@ public class Main {
 	 */
 
 	private static final String CAPTION_LS_FLAG = "--captionls", IMG_DIR_FLAG = "--imgdir", EDITED_EDGE_FLAG = "--edge",
-			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help", DELIMIT_FRASE = ";", FNT_PADRAO = "Arial";
+			REVIEW_MODE_FLAG = "--reviewtime", HELP_FLAG = "--help", DELIMIT_FRASE = ";", FNT_PADRAO = "Noto Sans",
+			COR_FNT_PADRAO = "black";
 	private static final int COMPRIM_RECUSADO_VET_STR = 0, COMPRIM_MIN_VET_IMG = 1, COMPRIM_MIN_ARG = 4,
 			COMPRIM_MAX_ARG = 7;
 	private static final double FATOR_MARG = 1.05;
@@ -194,8 +195,7 @@ public class Main {
 		escaneadr.close();
 	}
 
-	static byte encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato,
-			AttributedString txtcomatr)
+	static byte encaminharOpcaoMenu(Scanner escaneadr, OperacaoComMeme conjartefato, AttributedString txtcomatr)
 			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
 		System.out.printf(
 				"As operações disponíveis neste programa são as seguintes:\n\n1 — Criar meme com as configurações atuais\n2 — Definir fonte tipográfica para os próximos memes (até o programa sair)\n3 — Definir cor da fonte tipográfica para os próximos memes (até o programa sair)\n4 — Encerrar programa\n\nDigite o código (1–4) correspondente à opção desejada: ");
@@ -218,8 +218,10 @@ public class Main {
 						corfntusuario = conjatr.get(AtrPersonalizado.COR_FNT);
 				System.out.printf(
 						"===CONFIGURAÇÕES ATUAIS===\nFonte tipográfica: %s\nCor da fonte da legenda (em inglês): %s.\n",
-						familiafntusuario != null ? familiafntusuario.toString() : "padrão do sistema",
-						corfntusuario != null ? corfntusuario.toString() : "padrão do sistema");
+						familiafntusuario != null ? familiafntusuario.toString()
+								: "padrão do programa (".concat(FNT_PADRAO).concat(")"),
+						corfntusuario != null ? corfntusuario.toString()
+								: "padrão do programa (".concat(COR_FNT_PADRAO).concat(")"));
 				BufferedImage imgaleat = obterImgAleatoria(conjartefato.getConjimg(), conjartefato.getLsarq(),
 						conjartefato.temRevisaoativ(), escaneadr);
 				String frasesel = obterFraseAleatoria(conjartefato.getConjlegend(), conjartefato.temRevisaoativ(),
@@ -272,8 +274,7 @@ public class Main {
 		return selecaomenu;
 	}
 
-	static String aferirIntervaloComprimento(int comprimMin, int comprimMax, int comprimReal,
-			boolean temrevisao) {
+	static String aferirIntervaloComprimento(int comprimMin, int comprimMax, int comprimReal, boolean temrevisao) {
 		boolean comprimincompleto = temrevisao ? (comprimReal == 4 || comprimReal == 6)
 				: (comprimReal == 5 || comprimReal == 7);
 		String razaoretornocomp = comprimReal < comprimMin
@@ -322,17 +323,17 @@ public class Main {
 									"[ERRO FATAL] Não existe nenhum arquivo na pasta informada. É necessário pelo menos um arquivo que seja uma imagem.");
 							break;
 						}
-						BigDecimal[][] lsprop = new BigDecimal[lsarq.length][2];
+						BigDecimal[][] lsprop = new BigDecimal[lsarq.length][3];
 						for (int j = 0; j < lsarq.length; j++) {
 							lsprop[j][0] = new BigDecimal(lsarq[j].length()).divide(FATR_B_CONVERSAO);
 							if (lsprop[j][0].compareTo(TAM_MAX_KB_ARQ_IMG) == 1) {
 								System.out.printf(
-										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n",
+										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n\n",
 										lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
 								continue;
 							} else if (lsprop[j][0].compareTo(TAM_MIN_KB_ARQ_IMG) == -1) {
 								System.out.printf(
-										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n",
+										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n\n",
 										lsarq[j].getAbsolutePath(), TAM_MIN_KB_ARQ_IMG.toPlainString());
 								continue;
 							} else {
@@ -341,6 +342,16 @@ public class Main {
 									conjimg = preencherOuConcatVet(conjimg, imgLida);
 
 									lsarqutil = preencherOuConcatVet(lsarq, lsarqutil, j);
+									lsprop[j][1] = BigDecimal.valueOf(imgLida.getWidth());
+									lsprop[j][2] = BigDecimal.valueOf(imgLida.getHeight());
+									System.out.printf("Propriedades da imagem %s — tamanho, largura, altura:\n",
+											lsarq[j].getAbsolutePath());
+									String[] unid = new String[] { "KB", "px" };
+									System.out.printf("%s %s", lsprop[j][0].toPlainString(), unid[0]);
+									for (int k = 1; k <= 2; k++) {
+										System.out.printf(", %s %s", lsprop[j][k].toPlainString(), unid[1]);
+									}
+									System.out.printf(".\n\n");
 								}
 							}
 						}
@@ -368,7 +379,7 @@ public class Main {
 						conjlegend = validarArqFrase(lsarg[i]);
 						if (conjlegend == null || conjlegend[0].equals("ERR"))
 							break;
-						System.out.printf("Strings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
+						System.out.printf("\nStrings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
 						argtemarqfrase = true;
 					} else {
 						System.out.printf("[ERRO FATAL] Arquivo de frases informado não existe.");
