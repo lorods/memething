@@ -675,15 +675,18 @@ public class Main {
 	}
 
 	static double manipularTamFnt(Shape contorno, BufferedImage imgamostra, Font fntsis) {
-		double largtxtnormal = contorno.getBounds().getWidth(), alturatxtnormal = contorno.getBounds().getHeight();
+		double largtxtnormal = contorno.getBounds2D().getWidth(), alturatxtnormal = contorno.getBounds2D().getHeight();
 		int largimg = imgamostra.getWidth();
 		int alturaimg = imgamostra.getHeight();
+		if (largtxtnormal <= 0 || alturatxtnormal <= 0) {
+			return 0;
+		}
 		boolean margemconfortavel = largimg > largtxtnormal * FATOR_MARG && alturaimg > alturatxtnormal * FATOR_MARG;
 		if (margemconfortavel)
 			return 0;
 		else {
-			double tamfntreflarg = (fntsis.getSize2D() * largimg) / largtxtnormal,
-					tamfntrefaltura = (fntsis.getSize2D() * alturaimg) / alturatxtnormal;
+			double tamfntreflarg = (fntsis.getSize2D() * largimg) / (largtxtnormal * FATOR_MARG),
+					tamfntrefaltura = (fntsis.getSize2D() * alturaimg) / (alturatxtnormal * FATOR_MARG);
 			return (tamfntreflarg < tamfntrefaltura) ? tamfntreflarg : tamfntrefaltura;
 		}
 	}
