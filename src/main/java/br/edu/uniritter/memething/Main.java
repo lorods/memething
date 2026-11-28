@@ -164,11 +164,10 @@ public class Main {
 	private static final BigDecimal TAM_MAX_KB_ARQ_IMG = new BigDecimal(5000),
 			TAM_MIN_KB_ARQ_IMG = new BigDecimal("0.008"), TAM_MAX_KB_ARQ_STR = new BigDecimal(Integer.SIZE),
 			TAM_MIN_KB_ARQ_STR = new BigDecimal("0.002"), FATR_B_CONVERSAO = new BigDecimal(1000);
-	private static final SecureRandom aleatSegur = new SecureRandom();
+	private static final SecureRandom ALEAT_SEGUR = new SecureRandom();
 	private static OperacaoComMeme conjArtefato;
 
-	public static void main(String[] args)
-			throws IOException, NoSuchFieldException, IllegalArgumentException, IllegalAccessException {
+	public static void main(String[] args) throws NoSuchFieldException, IllegalAccessException, IOException {
 		final int comprimReal = args.length;
 		execOperacionalizacao(COMPRIM_MIN_ARG, COMPRIM_MAX_ARG, comprimReal, args);
 	}
@@ -180,8 +179,6 @@ public class Main {
 					"===Ajuda do programa===\nAbaixo, colchetes denotam um parâmetro facultativo:\n\n--imgdir <caminho>\tpasta que contém as imagens de amostra, uma sorteada por meme\n--captionls <caminho>\tarquivo com strings para a legenda separadas por ponto e vírgula\n[--edge <top|bottom>]\to lado vertical próximo do qual a legenda deve ser inserida\n[--reviewtime]\tperguntar se o valor sorteado deve ser descartado ou usado\n[--help]\texibir esta mensagem de ajuda e encerrar");
 			return;
 		}
-		Scanner escaneadr = (System.console() != null) ? new Scanner(System.in, System.console().charset())
-				: new Scanner(System.in);
 		String razaoErro = aferirIntervaloComprimento(comprimMinArg, comprimMaxArg, comprimReal,
 				Arrays.asList(args).contains(REVIEW_MODE_FLAG));
 		if (razaoErro != null) {
@@ -193,6 +190,8 @@ public class Main {
 		AttributedString txtcomatr = new AttributedString(new String("-"));
 		if (conjArtefato == null)
 			return;
+		Scanner escaneadr = (System.console() != null) ? new Scanner(System.in, System.console().charset())
+				: new Scanner(System.in);
 		while (selecaoEscolhaMenu != -1) {
 			selecaoEscolhaMenu = encaminharOpcaoMenu(escaneadr, txtcomatr);
 		}
@@ -236,17 +235,17 @@ public class Main {
 			txtComAtr.addAttributes(conjatr, 0, frasesel.length());
 			Graphics ctxgrafimg = desenharStringEmImg(imgaleat, frasesel, conjArtefato.getLadoedicaovert(),
 					!txtComAtr.getIterator().getAllAttributeKeys().isEmpty() ? txtComAtr : null);
+			ctxgrafimg.dispose();
 			String seloAtualDtHr = DateTimeFormatter.ofPattern("ddMMyyyy_HHmmss").withZone(ZoneId.systemDefault())
 					.format(Instant.now());
 			String prefixDirEscrita = System.getProperty("user.home");
 			File arqParaEscrita = new File(prefixDirEscrita,
-					"memething/editado/meme_".concat(seloAtualDtHr).concat(".png"));
+					".memething/editado/meme_".concat(seloAtualDtHr).concat(".png"));
 			boolean arqEstaDisponivel = manipularArqSaida(arqParaEscrita);
 			if (arqEstaDisponivel) {
 				gravarImgEmArq(imgaleat, arqParaEscrita);
 			} else
 				return -1;
-			ctxgrafimg.dispose();
 		}
 		case DEFINIR_FNT_NA_MEM -> {
 			System.out
@@ -329,16 +328,18 @@ public class Main {
 						File dirimg = new File(lsarg[i]);
 						lsarq = aferirItemFilho(dirimg);
 						if (lsarq == null) {
-							break;
+							System.out.printf(
+									"[ERRO FATAL] O diretório-alvo de escrita não é passível de leitura. Operação abortada.");
+							return null;
 						} else if (lsarq.length == 0) {
 							System.out.printf(
 									"[ERRO FATAL] Não existe nenhum arquivo elegível na pasta informada. É necessário pelo menos um arquivo que seja uma imagem.");
-							break;
+							return null;
 						}
 						BigDecimal[][] lsprop = new BigDecimal[0][0];
-						int indProp;
+						int indProp = 0;
 						for (int j = 0; j < lsarq.length; j++) {
-							BigDecimal resultConvTam = converterValBParaKB(lsarq[j].length(), j);
+							BigDecimal resultConvTam = converterValBParaKB(lsarq[j].length());
 							if (aferirAceitacaoBigDecParaImg(resultConvTam, true) == -1) {
 								System.out.printf(
 										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n\n",
@@ -355,9 +356,9 @@ public class Main {
 									conjimg = preencherOuConcatVet(conjimg, imgLida);
 
 									lsarqutil = preencherOuConcatVet(lsarq, lsarqutil, j);
+									indProp = lsprop.length;
 									if (lsprop.length == 0) {
 										lsprop = new BigDecimal[1][3];
-										indProp = (lsprop.length - 1);
 										lsprop[indProp][0] = resultConvTam;
 										lsprop[indProp][1] = BigDecimal.valueOf(imgLida.getWidth());
 										lsprop[indProp][2] = BigDecimal.valueOf(imgLida.getHeight());
@@ -370,9 +371,9 @@ public class Main {
 									System.out.printf("Propriedades da imagem %s — tamanho, largura, altura:\n",
 											lsarq[j].getAbsolutePath());
 									String[] unid = new String[] { "KB", "px" };
-									System.out.printf("%s %s", lsprop[j][0].toPlainString(), unid[0]);
+									System.out.printf("%s %s", lsprop[indProp][0].toPlainString(), unid[0]);
 									for (int k = 1; k <= 2; k++) {
-										System.out.printf(", %s %s", lsprop[j][k].toPlainString(), unid[1]);
+										System.out.printf(", %s %s", lsprop[indProp][k].toPlainString(), unid[1]);
 									}
 									System.out.printf(".\n\n");
 								}
@@ -386,11 +387,11 @@ public class Main {
 							argtemdirimg = true;
 						else {
 							System.out.printf("[ERRO FATAL] Diretório não contém imagens.");
-							break;
+							return null;
 						}
 					} else {
 						System.out.printf("[ERRO FATAL] Pasta informada não existe.");
-						break;
+						return null;
 					}
 				}
 			}
@@ -445,29 +446,32 @@ public class Main {
 				: resultConvTam.compareTo(TAM_MAX_KB_ARQ_IMG);
 	}
 
-	static BigDecimal converterValBParaKB(long compLsarq, int j) {
+	static BigDecimal converterValBParaKB(long compLsarq) {
 		BigDecimal resultConvTam = new BigDecimal(compLsarq).divide(FATR_B_CONVERSAO);
 		return resultConvTam;
 	}
 
 	static File[] aferirItemFilho(File dirimg) {
-		File ancestral = dirimg;
+		File ancestral = dirimg.isAbsolute() ? dirimg.getParentFile().getAbsoluteFile() : dirimg;
 		while ((ancestral = ancestral.getParentFile()) != null && !ancestral.exists()) {
 		}
-		boolean temPermissao = (ancestral != null && Files.isWritable(ancestral.toPath()));
+		boolean temPermissao = (ancestral != null && Files.isReadable(ancestral.toPath()));
 		if (!temPermissao) {
-			System.out.printf("[ERRO FATAL] O diretório-pai %s não é passível de escrita.",
-					ancestral.getAbsolutePath());
+			System.out.printf("[ERRO FATAL] O diretório-pai"
+					.concat(ancestral != null ? ancestral.getAbsolutePath() : new String())
+					.concat(" não é passível de escrita.\n"));
 			return null;
 		}
 		File[] conjArqValid = new File[0], conjArqValidAux = dirimg.listFiles((dir, name) -> !name.equals("out"));
 		File arq;
-		for (int i = 0; i < conjArqValidAux.length; i++) {
-			arq = conjArqValidAux[i];
-			if (arq.isFile()) {
-				conjArqValid = conjArqValid.length == 0 ? new File[1]
-						: Arrays.copyOf(conjArqValid, (conjArqValid.length + 1));
-				conjArqValid[(conjArqValid.length - 1)] = arq;
+		if (conjArqValidAux != null) {
+			for (int i = 0; i < conjArqValidAux.length; i++) {
+				arq = conjArqValidAux[i];
+				if (arq.isFile()) {
+					conjArqValid = conjArqValid.length == 0 ? new File[1]
+							: Arrays.copyOf(conjArqValid, (conjArqValid.length + 1));
+					conjArqValid[(conjArqValid.length - 1)] = arq;
+				}
 			}
 		}
 		return conjArqValid;
@@ -487,7 +491,7 @@ public class Main {
 
 	static String[] validarArqFrase(String caminhoarq) throws IOException {
 		File arqlegend = new File(caminhoarq);
-		String[] conjlegend = null;
+		String[] conjlegend = new String[0];
 		boolean temcorte = false;
 		if (aferirAceitacaoBigDecParaLeg(new BigDecimal((arqlegend.length())).divide(FATR_B_CONVERSAO), true) == -1) {
 			System.out.printf("[ERRO FATAL] O arquivo com legendas para o meme praticamente não possui texto.\n");
@@ -517,7 +521,7 @@ public class Main {
 			String fraseLimpa = segmentacaoBruta[i].contains("\u0020") ? segmentacaoBruta[i].trim()
 					: segmentacaoBruta[i];
 			if (!fraseLimpa.isEmpty()) {
-				conjlegend = conjlegend.length == 0 ? new String[0] : Arrays.copyOf(conjlegend, conjlegend.length + 1);
+				conjlegend = conjlegend.length == 0 ? new String[1] : Arrays.copyOf(conjlegend, conjlegend.length + 1);
 				conjlegend[(conjlegend.length - 1)] = fraseLimpa;
 			}
 		}
@@ -549,7 +553,7 @@ public class Main {
 		return conjlegend;
 	}
 
-	private static int aferirAceitacaoBigDecParaLeg(BigDecimal resultConvTam, boolean primInvocIteracao) {
+	static int aferirAceitacaoBigDecParaLeg(BigDecimal resultConvTam, boolean primInvocIteracao) {
 		return primInvocIteracao ? resultConvTam.compareTo(TAM_MIN_KB_ARQ_STR)
 				: resultConvTam.compareTo(TAM_MAX_KB_ARQ_STR);
 	}
@@ -590,7 +594,11 @@ public class Main {
 				System.out.printf("A frase aleatória selecionada é ".concat(conjlegend[indAleatSegur]).concat(
 						". Você deseja continuar com ela? Digite \"não\" se não quiser, caso contrário \"sim\" ou qualquer outro valor: "));
 				String decisaorev = escaneadr.nextLine();
-				if (!decisaorev.toLowerCase().equals("não"))
+				decisaorev = decisaorev.toLowerCase(Locale.ROOT);
+				if (decisaorev.contains("\u0020")) {
+					decisaorev = decisaorev.trim();
+				}
+				if (!decisaorev.equals("não") && !decisaorev.equals("nao"))
 					break;
 			} else
 				break;
@@ -599,7 +607,7 @@ public class Main {
 	}
 
 	static int obterIntAleatSegur(int comprim) {
-		return aleatSegur.nextInt(comprim);
+		return ALEAT_SEGUR.nextInt(comprim);
 	}
 
 	static boolean aferirDisponibilidadeFnt(String nomefamiliafnt) {
@@ -607,14 +615,15 @@ public class Main {
 		return Arrays.asList(bibfnt).contains(nomefamiliafnt);
 	}
 
-	static Color procurarFntLocal(String nomecorfnt) throws IllegalAccessException {
-		Color corFnt;
+	static Color procurarFntLocal(String nomeCorFnt) {
+		if (nomeCorFnt == null)
+			return null;
 		try {
-			corFnt = Color.class.cast(Color.class.getField(nomecorfnt.trim().toUpperCase()).get(null));
-		} catch (NoSuchFieldException nsfe) {
-			corFnt = null;
+			Object corDeriv = Color.class.getField(nomeCorFnt.trim().toUpperCase(Locale.ROOT)).get(null);
+			return (corDeriv instanceof Color) ? Color.class.cast(corDeriv) : null;
+		} catch (NoSuchFieldException | IllegalAccessException e) {
+			return null;
 		}
-		return corFnt;
 	}
 
 	static Graphics desenharStringEmImg(BufferedImage imgAleat, String frase, String ladoVertEscrita,
