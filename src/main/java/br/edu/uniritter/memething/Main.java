@@ -1,17 +1,14 @@
 package br.edu.uniritter.memething;
 
-import java.io.FileReader;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Scanner;
-
 import javax.imageio.ImageIO;
-import java.io.BufferedReader;
 import java.awt.image.BufferedImage;
 import java.awt.Color;
 import java.awt.Font;
@@ -21,6 +18,7 @@ import java.awt.GraphicsEnvironment;
 import java.awt.Shape;
 import java.awt.font.GlyphVector;
 import java.awt.font.TextAttribute;
+import java.io.IOException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.security.SecureRandom;
@@ -243,8 +241,11 @@ public class Main {
 			String prefixDirEscrita = System.getProperty("user.home");
 			File arqParaEscrita = new File(prefixDirEscrita,
 					"memething/editado/meme_".concat(seloAtualDtHr).concat(".png"));
-			manipularArqSaida(arqParaEscrita);
-			gravarImgEmArq(imgaleat, arqParaEscrita);
+			boolean arqEstaDisponivel = manipularArqSaida(arqParaEscrita);
+			if (arqEstaDisponivel) {
+				gravarImgEmArq(imgaleat, arqParaEscrita);
+			} else
+				return -1;
 			ctxgrafimg.dispose();
 		}
 		case DEFINIR_FNT_NA_MEM -> {
@@ -327,23 +328,26 @@ public class Main {
 					if (temdir) {
 						File dirimg = new File(lsarg[i]);
 						lsarq = aferirItemFilho(dirimg);
-						if (lsarq.length == 0) {
+						if (lsarq == null) {
+							break;
+						} else if (lsarq.length == 0) {
 							System.out.printf(
-									"[ERRO FATAL] Não existe nenhum arquivo na pasta informada. É necessário pelo menos um arquivo que seja uma imagem.");
+									"[ERRO FATAL] Não existe nenhum arquivo elegível na pasta informada. É necessário pelo menos um arquivo que seja uma imagem.");
 							break;
 						}
 						BigDecimal[][] lsprop = new BigDecimal[0][0];
+						int indProp;
 						for (int j = 0; j < lsarq.length; j++) {
 							BigDecimal resultConvTam = converterValBParaKB(lsarq[j].length(), j);
-							if (aferirAceitacaoBigDecParaImg(resultConvTam, true) == 1) {
-								System.out.printf(
-										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n\n",
-										lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
-								continue;
-							} else if (aferirAceitacaoBigDecParaImg(resultConvTam, false) == -1) {
+							if (aferirAceitacaoBigDecParaImg(resultConvTam, true) == -1) {
 								System.out.printf(
 										"[AVISO] O arquivo %s não satisfaz o tamanho mínimo de imagem individual processado por este programa (%s KB = 8 B). Ele não será sorteado como base de meme.\n\n",
 										lsarq[j].getAbsolutePath(), TAM_MIN_KB_ARQ_IMG.toPlainString());
+								continue;
+							} else if (aferirAceitacaoBigDecParaImg(resultConvTam, false) == 1) {
+								System.out.printf(
+										"[AVISO] O arquivo %s excede o tamanho máximo de imagem individual processado por este programa (%s KB). Ele não será sorteado como base de meme.\n\n",
+										lsarq[j].getAbsolutePath(), TAM_MAX_KB_ARQ_IMG.toPlainString());
 								continue;
 							} else {
 								BufferedImage imgLida = ImageIO.read(lsarq[j]);
@@ -353,9 +357,10 @@ public class Main {
 									lsarqutil = preencherOuConcatVet(lsarq, lsarqutil, j);
 									if (lsprop.length == 0) {
 										lsprop = new BigDecimal[1][3];
-										lsprop[j][0] = resultConvTam;
-										lsprop[j][1] = BigDecimal.valueOf(imgLida.getWidth());
-										lsprop[j][2] = BigDecimal.valueOf(imgLida.getHeight());
+										indProp = (lsprop.length - 1);
+										lsprop[indProp][0] = resultConvTam;
+										lsprop[indProp][1] = BigDecimal.valueOf(imgLida.getWidth());
+										lsprop[indProp][2] = BigDecimal.valueOf(imgLida.getHeight());
 									} else {
 										lsprop = Arrays.copyOf(lsprop, lsprop.length + 1);
 										lsprop[lsprop.length - 1] = new BigDecimal[] { resultConvTam,
@@ -394,7 +399,7 @@ public class Main {
 				if (lsarg[(i - 1)].equals(CAPTION_LS_FLAG)) {
 					if (new File(lsarg[i]).isFile()) {
 						conjlegend = validarArqFrase(lsarg[i]);
-						if (conjlegend == null || conjlegend[0].equals(null))
+						if (conjlegend == null || conjlegend[0] == null)
 							break;
 						System.out.printf("\nStrings de frases: %s\n\n", resgatarStringDeArrComPontuacao(conjlegend));
 						argtemarqfrase = true;
@@ -446,7 +451,26 @@ public class Main {
 	}
 
 	static File[] aferirItemFilho(File dirimg) {
-		return dirimg.listFiles((dir, name) -> !name.equals("out"));
+		File ancestral = dirimg;
+		while ((ancestral = ancestral.getParentFile()) != null && !ancestral.exists()) {
+		}
+		boolean temPermissao = (ancestral != null && Files.isWritable(ancestral.toPath()));
+		if (!temPermissao) {
+			System.out.printf("[ERRO FATAL] O diretório-pai %s não é passível de escrita.",
+					ancestral.getAbsolutePath());
+			return null;
+		}
+		File[] conjArqValid = new File[0], conjArqValidAux = dirimg.listFiles((dir, name) -> !name.equals("out"));
+		File arq;
+		for (int i = 0; i < conjArqValidAux.length; i++) {
+			arq = conjArqValidAux[i];
+			if (arq.isFile()) {
+				conjArqValid = conjArqValid.length == 0 ? new File[1]
+						: Arrays.copyOf(conjArqValid, (conjArqValid.length + 1));
+				conjArqValid[(conjArqValid.length - 1)] = arq;
+			}
+		}
+		return conjArqValid;
 	}
 
 	static BufferedImage[] preencherOuConcatVet(BufferedImage[] conjimg, BufferedImage imgLida) {
@@ -474,8 +498,6 @@ public class Main {
 					"[AVISO] O arquivo com legendas para o meme possui um tamanho superior ao permitido. Ele será reduzido ao maior tamanho compatível por meio da exclusão das últimas frases.\n");
 			temcorte = true;
 		}
-		FileReader leitorarq = new FileReader(arqlegend);
-		BufferedReader leitorsegmnt = new BufferedReader(leitorarq);
 		int limiteB = TAM_MAX_KB_ARQ_STR.intValue() * FATR_B_CONVERSAO.intValue();
 		byte[] leituraB;
 		try (FileInputStream streamEntrada = new FileInputStream(arqlegend)) {
@@ -486,13 +508,19 @@ public class Main {
 		int ultimaDelimit = texto.lastIndexOf(DELIMIT_FRASE);
 		if (ultimaDelimit == -1) {
 			System.out.printf("[ERRO FATAL] Não foi encontrado o separador \";\" para indexar as frases.\n");
-			leitorsegmnt.close();
 			return null;
 		}
-		if (temcorte) {
+		if (temcorte)
 			texto = texto.substring(0, ultimaDelimit); // descarta a frase final cortada no limite de 32 KB
+		String[] segmentacaoBruta = texto.split(DELIMIT_FRASE);
+		for (int i = 0; i < segmentacaoBruta.length; i++) {
+			String fraseLimpa = segmentacaoBruta[i].contains("\u0020") ? segmentacaoBruta[i].trim()
+					: segmentacaoBruta[i];
+			if (!fraseLimpa.isEmpty()) {
+				conjlegend = conjlegend.length == 0 ? new String[0] : Arrays.copyOf(conjlegend, conjlegend.length + 1);
+				conjlegend[(conjlegend.length - 1)] = fraseLimpa;
+			}
 		}
-		conjlegend = texto.split(DELIMIT_FRASE);
 		/*
 		 * if (temcorte) { char[] bufferLimitd = new char[(TAM_MAX_KB_ARQ_STR.intValue()
 		 * * FATR_B_CONVERSAO.intValue())]; int leiturab =
@@ -516,11 +544,8 @@ public class Main {
 		 * ); leitorarq.close(); return null; } conjlegend =
 		 * linhasincroniz.split(DELIMIT_FRASE); }
 		 */
-		if (conjlegend.length == COMPRIM_RECUSADO_VET_STR) {
-			leitorarq.close();
+		if (conjlegend.length == COMPRIM_RECUSADO_VET_STR)
 			return null;
-		}
-		leitorarq.close();
 		return conjlegend;
 	}
 
@@ -627,12 +652,19 @@ public class Main {
 		return grafImg;
 	}
 
-	private static void manipularArqSaida(File arqSaida) {
-		if (arqSaida.exists())
-			return;
-		else if (!arqSaida.getParentFile().mkdirs())
+	private static boolean manipularArqSaida(File arqSaida) {
+		if (!arqSaida.exists() && !arqSaida.getParentFile().exists()) {
 			System.out.printf(
-					"O programa não conseguiu criar os diretórios necessários para armazenar os memes. Certifique-se de que o usuário com o qual você está logado tem permissão RW para eles.\n");
+					"[AVISO] A criação de um ou mais diretórios se faz necessária. O programa vai tentar criá-los agora.\n");
+			if (!arqSaida.getParentFile().mkdirs()) {
+				System.out.printf(
+						"[ERRO FATAL] O programa não conseguiu criar os diretórios necessários para armazenar os memes. Certifique-se de que o usuário com o qual você está logado tem permissão RW para eles.\n");
+				return false;
+			} else
+				System.out.printf(
+						"[AVISO] O programa criou os diretórios necessários para armazenar o arquivo com sucesso.\n");
+		}
+		return true;
 	}
 
 	private static void gravarImgEmArq(BufferedImage imgMeme, File arqAGravar) throws IOException {
